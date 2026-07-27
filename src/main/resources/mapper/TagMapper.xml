@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qianfan.tag.mapper.TagMapper">
+    <resultMap id="ruleMatchMap" type="com.qianfan.tag.trie.RuleMatch">
+        <id column="RULE_ID" property="ruleId"/>
+        <result column="TAG_ID" property="tagId"/>
+        <result column="KEYWORD" property="keyword"/>
+        <result column="AUTO_APPROVE" property="autoApprove"/>
+    </resultMap>
+    <insert id="insertTag">
+        INSERT INTO PT_TAG_DEFINITION
+        (ID, CODE, NAME, CATEGORY, DESCRIPTION, STATUS, AUTO_APPROVE, CREATED_AT, UPDATED_AT)
+        VALUES
+        (#{id}, #{code}, #{name}, #{category}, #{description}, #{status}, #{autoApprove}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="findTagById" resultType="com.qianfan.tag.domain.TagDefinition">
+        SELECT * FROM PT_TAG_DEFINITION WHERE ID = #{id}
+    </select>
+
+    <select id="findTagByCode" resultType="com.qianfan.tag.domain.TagDefinition">
+        SELECT * FROM PT_TAG_DEFINITION WHERE CODE = #{code}
+    </select>
+
+    <select id="findAllTags" resultType="com.qianfan.tag.domain.TagDefinition">
+        SELECT * FROM PT_TAG_DEFINITION ORDER BY CATEGORY, CODE
+    </select>
+
+    <update id="updateTag">
+        UPDATE PT_TAG_DEFINITION SET NAME = #{name}, CATEGORY = #{category}, DESCRIPTION = #{description},
+            AUTO_APPROVE = #{autoApprove}, UPDATED_AT = #{updatedAt} WHERE ID = #{id}
+    </update>
+
+    <update id="updateTagStatus">
+        UPDATE PT_TAG_DEFINITION SET STATUS = #{status}, UPDATED_AT = #{updatedAt} WHERE ID = #{id}
+    </update>
+
+    <insert id="insertRule">
+        INSERT INTO PT_TAG_RULE
+        (ID, TAG_ID, KEYWORD, NORMALIZED_KEYWORD, STATUS, VERSION_NO, CREATED_AT, UPDATED_AT)
+        VALUES
+        (#{id}, #{tagId}, #{keyword}, #{normalizedKeyword}, #{status}, #{version}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="findRule" resultType="com.qianfan.tag.domain.TagRule">
+        SELECT ID, TAG_ID, KEYWORD, NORMALIZED_KEYWORD, STATUS, VERSION_NO AS VERSION, CREATED_AT, UPDATED_AT
+        FROM PT_TAG_RULE
+        WHERE TAG_ID = #{tagId} AND NORMALIZED_KEYWORD = #{normalizedKeyword}
+    </select>
+
+    <select id="findRuleById" resultType="com.qianfan.tag.domain.TagRule">
+        SELECT ID, TAG_ID, KEYWORD, NORMALIZED_KEYWORD, STATUS, VERSION_NO AS VERSION, CREATED_AT, UPDATED_AT
+        FROM PT_TAG_RULE WHERE ID = #{id}
+    </select>
+
+    <update id="updateRuleStatus">
+        UPDATE PT_TAG_RULE SET STATUS = #{status}, VERSION_NO = VERSION_NO + 1, UPDATED_AT = #{updatedAt}
+        WHERE ID = #{id}
+    </update>
+
+    <select id="findRulesByTagId" resultType="com.qianfan.tag.domain.TagRule">
+        SELECT ID, TAG_ID, KEYWORD, NORMALIZED_KEYWORD, STATUS, VERSION_NO AS VERSION, CREATED_AT, UPDATED_AT
+        FROM PT_TAG_RULE WHERE TAG_ID = #{tagId} ORDER BY CREATED_AT
+    </select>
+
+    <select id="findEnabledRuleMatches" resultMap="ruleMatchMap">
+        SELECT R.ID AS RULE_ID, R.TAG_ID, R.KEYWORD,
+               CASE WHEN T.AUTO_APPROVE = 1 THEN 1 ELSE 0 END AS AUTO_APPROVE
+        FROM PT_TAG_RULE R
+        INNER JOIN PT_TAG_DEFINITION T ON T.ID = R.TAG_ID
+        WHERE R.STATUS = 1 AND T.STATUS = 1
+        ORDER BY R.ID
+    </select>
+</mapper>

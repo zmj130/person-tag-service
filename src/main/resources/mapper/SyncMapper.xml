@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qianfan.tag.mapper.SyncMapper">
+    <select id="findBatchByNo" resultType="com.qianfan.tag.domain.SyncBatch">
+        SELECT * FROM PT_SYNC_BATCH WHERE BATCH_NO = #{batchNo}
+    </select>
+
+    <insert id="insertBatch">
+        INSERT INTO PT_SYNC_BATCH
+        (ID, BATCH_NO, SYNC_TYPE, STATUS, CURSOR_BEFORE, CURSOR_AFTER, RECEIVED_COUNT,
+         SUCCESS_COUNT, FAILURE_COUNT, ERROR_MESSAGE, STARTED_AT, FINISHED_AT)
+        VALUES
+        (#{id}, #{batchNo}, #{syncType}, #{status}, #{cursorBefore}, #{cursorAfter}, #{receivedCount},
+         #{successCount}, #{failureCount}, #{errorMessage}, #{startedAt}, #{finishedAt})
+    </insert>
+
+    <update id="markBatchRunning">
+        UPDATE PT_SYNC_BATCH SET STATUS = 'RUNNING', ERROR_MESSAGE = NULL, STARTED_AT = #{startedAt},
+            FINISHED_AT = NULL WHERE BATCH_NO = #{batchNo}
+    </update>
+
+    <update id="updateProgress">
+        UPDATE PT_SYNC_BATCH SET CURSOR_AFTER = #{cursorAfter},
+            RECEIVED_COUNT = RECEIVED_COUNT + #{received},
+            SUCCESS_COUNT = SUCCESS_COUNT + #{success},
+            FAILURE_COUNT = FAILURE_COUNT + #{failure}
+        WHERE BATCH_NO = #{batchNo}
+    </update>
+
+    <update id="finishBatch">
+        UPDATE PT_SYNC_BATCH SET STATUS = #{status}, ERROR_MESSAGE = #{errorMessage},
+            FINISHED_AT = #{finishedAt} WHERE BATCH_NO = #{batchNo}
+    </update>
+
+    <select id="findCursor" resultType="string">
+        SELECT LAST_CURSOR FROM PT_SYNC_STATE WHERE TASK_CODE = #{taskCode}
+    </select>
+
+    <update id="updateCursor">
+        UPDATE PT_SYNC_STATE SET LAST_CURSOR = #{cursor}, UPDATED_AT = #{updatedAt}
+        WHERE TASK_CODE = #{taskCode}
+    </update>
+</mapper>

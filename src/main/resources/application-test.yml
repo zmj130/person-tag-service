@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:person_tag;MODE=Oracle;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=true
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      schema-locations: classpath:db/h2/schema-h2.sql
+      data-locations: classpath:db/h2/data-h2.sql
+remote-person:
+  mode: mock
+scheduler:
+  token: test-token

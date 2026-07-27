@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qianfan.tag.mapper.PersonMapper">
+    <sql id="searchConditions">
+        P.DELETED_FLAG = 0
+        <if test="keyword != null and keyword != ''">
+            AND (P.NAME LIKE '%' || #{keyword} || '%'
+                 OR P.EXTERNAL_ID LIKE '%' || #{keyword} || '%'
+                 OR P.ORGANIZATION LIKE '%' || #{keyword} || '%'
+                 OR P.OCCUPATION LIKE '%' || #{keyword} || '%')
+        </if>
+        <if test="tagIds != null and tagIds.size() > 0">
+            AND P.ID IN (
+                SELECT PT.PERSON_ID FROM PT_PERSON_TAG PT
+                WHERE PT.STATUS = 'APPROVED'
+                  AND PT.TAG_ID IN
+                  <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+                      #{tagId}
+                  </foreach>
+                GROUP BY PT.PERSON_ID
+                <if test="andMode">
+                    HAVING COUNT(DISTINCT PT.TAG_ID) = #{tagCount}
+                </if>
+            )
+        </if>
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO PT_PERSON
+        (ID, EXTERNAL_ID, NAME, GENDER, ORGANIZATION, OCCUPATION, ADDRESS, REMARK,
+         SOURCE_UPDATED_AT, DELETED_FLAG, CREATED_AT, UPDATED_AT)
+        VALUES
+        (#{id}, #{externalId}, #{name}, #{gender}, #{organization}, #{occupation}, #{address}, #{remark},
+         #{sourceUpdatedAt}, #{deleted}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE PT_PERSON SET NAME = #{name}, GENDER = #{gender}, ORGANIZATION = #{organization},
+            OCCUPATION = #{occupation}, ADDRESS = #{address}, REMARK = #{remark},
+            SOURCE_UPDATED_AT = #{sourceUpdatedAt}, DELETED_FLAG = #{deleted}, UPDATED_AT = #{updatedAt}
+        WHERE ID = #{id}
+    </update>
+
+    <select id="findById" resultType="com.qianfan.tag.domain.PersonRecord">
+        SELECT ID, EXTERNAL_ID, NAME, GENDER, ORGANIZATION, OCCUPATION, ADDRESS, REMARK,
+               SOURCE_UPDATED_AT, DELETED_FLAG AS DELETED, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON WHERE ID = #{id}
+    </select>
+
+    <select id="findByExternalId" resultType="com.qianfan.tag.domain.PersonRecord">
+        SELECT ID, EXTERNAL_ID, NAME, GENDER, ORGANIZATION, OCCUPATION, ADDRESS, REMARK,
+               SOURCE_UPDATED_AT, DELETED_FLAG AS DELETED, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON WHERE EXTERNAL_ID = #{externalId}
+    </select>
+
+    <select id="countSearch" resultType="long">
+        SELECT COUNT(1) FROM PT_PERSON P WHERE <include refid="searchConditions"/>
+    </select>
+
+    <select id="search" resultType="com.qianfan.tag.domain.PersonRecord">
+        SELECT * FROM (
+            SELECT P.ID, P.EXTERNAL_ID, P.NAME, P.GENDER, P.ORGANIZATION, P.OCCUPATION,
+                   P.ADDRESS, P.REMARK, P.SOURCE_UPDATED_AT, P.DELETED_FLAG AS DELETED,
+                   P.CREATED_AT, P.UPDATED_AT,
+                   ROW_NUMBER() OVER (ORDER BY P.UPDATED_AT DESC, P.ID) AS RN
+            FROM PT_PERSON P WHERE <include refid="searchConditions"/>
+        ) PAGE_DATA
+        WHERE PAGE_DATA.RN &gt; #{offset} AND PAGE_DATA.RN &lt;= #{endRow}
+        ORDER BY PAGE_DATA.RN
+    </select>
+</mapper>

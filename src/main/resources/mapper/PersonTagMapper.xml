@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qianfan.tag.mapper.PersonTagMapper">
+    <insert id="insert">
+        INSERT INTO PT_PERSON_TAG
+        (ID, PERSON_ID, TAG_ID, SOURCE_TYPE, STATUS, RULE_ID, BATCH_NO, MATCHED_KEYWORD,
+         REVIEWED_BY, REVIEWED_AT, CREATED_AT, UPDATED_AT)
+        VALUES
+        (#{id}, #{personId}, #{tagId}, #{source}, #{status}, #{ruleId}, #{batchNo}, #{matchedKeyword},
+         #{reviewedBy}, #{reviewedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="find" resultType="com.qianfan.tag.domain.PersonTag">
+        SELECT ID, PERSON_ID, TAG_ID, SOURCE_TYPE AS SOURCE, STATUS, RULE_ID, BATCH_NO,
+               MATCHED_KEYWORD, REVIEWED_BY, REVIEWED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON_TAG WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId}
+    </select>
+
+    <select id="findByPersonId" resultType="com.qianfan.tag.domain.PersonTag">
+        SELECT ID, PERSON_ID, TAG_ID, SOURCE_TYPE AS SOURCE, STATUS, RULE_ID, BATCH_NO,
+               MATCHED_KEYWORD, REVIEWED_BY, REVIEWED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON_TAG WHERE PERSON_ID = #{personId} ORDER BY CREATED_AT
+    </select>
+
+    <update id="updateBinding">
+        UPDATE PT_PERSON_TAG SET SOURCE_TYPE = #{source}, STATUS = #{status}, RULE_ID = #{ruleId},
+            BATCH_NO = #{batchNo}, MATCHED_KEYWORD = #{matchedKeyword}, REVIEWED_BY = #{reviewedBy},
+            REVIEWED_AT = #{reviewedAt}, UPDATED_AT = #{updatedAt}
+        WHERE ID = #{id}
+    </update>
+
+    <update id="review">
+        UPDATE PT_PERSON_TAG SET STATUS = #{status}, REVIEWED_BY = #{reviewer},
+            REVIEWED_AT = #{reviewedAt}, UPDATED_AT = #{reviewedAt}
+        WHERE ID = #{id}
+    </update>
+
+    <delete id="deleteManual">
+        DELETE FROM PT_PERSON_TAG
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId} AND SOURCE_TYPE = 'MANUAL'
+    </delete>
+
+    <delete id="deleteRemote">
+        DELETE FROM PT_PERSON_TAG
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId} AND SOURCE_TYPE = 'REMOTE'
+    </delete>
+
+    <delete id="deleteStaleRuleBindings">
+        DELETE FROM PT_PERSON_TAG
+        WHERE PERSON_ID = #{personId} AND SOURCE_TYPE = 'RULE' AND STATUS != 'REJECTED'
+        <if test="matchedTagIds != null and matchedTagIds.size() > 0">
+            AND TAG_ID NOT IN
+            <foreach collection="matchedTagIds" item="tagId" open="(" separator="," close=")">
+                #{tagId}
+            </foreach>
+        </if>
+    </delete>
+</mapper>
