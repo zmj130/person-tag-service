@@ -5,7 +5,10 @@ import com.qianfan.tag.common.Ids;
 import com.qianfan.tag.domain.PersonRecord;
 import com.qianfan.tag.domain.PersonTag;
 import com.qianfan.tag.domain.TagDefinition;
+import com.qianfan.tag.dto.PageResult;
+import com.qianfan.tag.dto.ReviewItem;
 import com.qianfan.tag.mapper.PersonTagMapper;
+import com.qianfan.tag.mapper.StructuredRuleMapper;
 import com.qianfan.tag.mapper.TagMapper;
 import com.qianfan.tag.trie.RuleMatch;
 import com.qianfan.tag.trie.TrieManager;
@@ -27,11 +30,14 @@ public class PersonTagService {
     private final PersonTagMapper personTagMapper;
     private final TagMapper tagMapper;
     private final TrieManager trieManager;
+    private final StructuredRuleMapper structuredRuleMapper;
 
-    public PersonTagService(PersonTagMapper personTagMapper, TagMapper tagMapper, TrieManager trieManager) {
+    public PersonTagService(PersonTagMapper personTagMapper, TagMapper tagMapper, TrieManager trieManager,
+                            StructuredRuleMapper structuredRuleMapper) {
         this.personTagMapper = personTagMapper;
         this.tagMapper = tagMapper;
         this.trieManager = trieManager;
+        this.structuredRuleMapper = structuredRuleMapper;
     }
 
     @Transactional
@@ -101,13 +107,51 @@ public class PersonTagService {
         if (!APPROVED.equals(status) && !REJECTED.equals(status)) {
             throw new BusinessException("INVALID_REVIEW_STATUS", "审核状态只能是 APPROVED 或 REJECTED");
         }
-        if (personTagMapper.review(bindingId, status, reviewer, new Date()) == 0) {
+        PersonTag binding = personTagMapper.findById(bindingId);
+        if (binding == null) {
             throw new BusinessException("BINDING_NOT_FOUND", "人员标签关系不存在");
+        }
+        Date reviewedAt = new Date();
+        personTagMapper.review(bindingId, status, reviewer, reviewedAt);
+        if ("RULE".equals(binding.getSource()) && binding.getRuleId() != null) {
+            structuredRuleMapper.reviewActiveEvidence(binding.getPersonId(), binding.getTagId(),
+                    binding.getRuleId(), status, reviewer, reviewedAt);
+        }
+    }
+
+    @Transactional
+    public void deleteRuleResult(String bindingId) {
+        PersonTag binding = personTagMapper.findById(bindingId);
+        if (binding == null) {
+            throw new BusinessException("BINDING_NOT_FOUND", "人员标签关系不存在");
+        }
+        if (!"RULE".equals(binding.getSource())) {
+            throw new BusinessException("RULE_BINDING_REQUIRED", "只能删除规则产生的标签结果");
+        }
+        if (binding.getRuleId() != null) {
+            structuredRuleMapper.deleteEvidenceForBinding(
+                    binding.getPersonId(), binding.getTagId(), binding.getRuleId());
+        }
+        if (personTagMapper.deleteRuleBindingById(bindingId) == 0) {
+            throw new BusinessException("BINDING_DELETE_FAILED", "规则标签结果删除失败");
         }
     }
 
     public List<PersonTag> listByPerson(String personId) {
         return personTagMapper.findByPersonId(personId);
+    }
+
+    public PageResult<ReviewItem> listReviews(String status, int pageNo, int pageSize) {
+        validatePage(pageNo, pageSize);
+        if (status != null && !PENDING.equals(status) && !APPROVED.equals(status) && !REJECTED.equals(status)) {
+            throw new BusinessException("INVALID_REVIEW_STATUS", "审核状态不合法");
+        }
+        int offset = (pageNo - 1) * pageSize;
+        long total = personTagMapper.countReviews(status);
+        List<ReviewItem> records = total == 0
+                ? java.util.Collections.<ReviewItem>emptyList()
+                : personTagMapper.findReviews(status, offset, offset + pageSize);
+        return new PageResult<ReviewItem>(total, pageNo, pageSize, records);
     }
 
     @Transactional
@@ -166,6 +210,12 @@ public class PersonTagService {
             throw new BusinessException("TAG_NOT_AVAILABLE", "标签不存在或已停用");
         }
         return tag;
+    }
+
+    private void validatePage(int pageNo, int pageSize) {
+        if (pageNo < 1 || pageSize < 1 || pageSize > 200) {
+            throw new BusinessException("INVALID_PAGE", "页码必须大于 0，分页大小范围为 1 到 200");
+        }
     }
 
     private String join(String... fields) {

@@ -5,6 +5,21 @@
         SELECT * FROM PT_SYNC_BATCH WHERE BATCH_NO = #{batchNo}
     </select>
 
+    <select id="countBatches" resultType="long">
+        SELECT COUNT(1) FROM PT_SYNC_BATCH
+        WHERE (#{status} IS NULL OR STATUS = #{status})
+    </select>
+
+    <select id="findBatches" resultType="com.qianfan.tag.domain.SyncBatch">
+        SELECT * FROM (
+            SELECT B.*, ROW_NUMBER() OVER (ORDER BY B.STARTED_AT DESC, B.ID) AS RN
+            FROM PT_SYNC_BATCH B
+            WHERE (#{status} IS NULL OR B.STATUS = #{status})
+        ) PAGE_DATA
+        WHERE PAGE_DATA.RN &gt; #{offset} AND PAGE_DATA.RN &lt;= #{endRow}
+        ORDER BY PAGE_DATA.RN
+    </select>
+
     <insert id="insertBatch">
         INSERT INTO PT_SYNC_BATCH
         (ID, BATCH_NO, SYNC_TYPE, STATUS, CURSOR_BEFORE, CURSOR_AFTER, RECEIVED_COUNT,

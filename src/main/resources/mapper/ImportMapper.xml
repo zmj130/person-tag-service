@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qianfan.tag.mapper.ImportMapper">
+    <select id="findByBatchNo" resultType="com.qianfan.tag.domain.ImportBatch">
+        SELECT ID, BATCH_NO, FILE_NAME, STATUS, TOTAL_COUNT, SUCCESS_COUNT, ERROR_MESSAGE, STARTED_AT, FINISHED_AT
+        FROM PT_IMPORT_BATCH WHERE BATCH_NO = #{batchNo}
+    </select>
+    <insert id="insert">
+        INSERT INTO PT_IMPORT_BATCH
+        (ID, BATCH_NO, FILE_NAME, STATUS, TOTAL_COUNT, SUCCESS_COUNT, ERROR_MESSAGE, STARTED_AT, FINISHED_AT)
+        VALUES (#{id}, #{batchNo}, #{fileName}, #{status}, #{totalCount}, #{successCount},
+                #{errorMessage}, #{startedAt}, #{finishedAt})
+    </insert>
+    <update id="restart">
+        UPDATE PT_IMPORT_BATCH SET FILE_NAME = #{fileName}, STATUS = 'RUNNING', TOTAL_COUNT = 0,
+            SUCCESS_COUNT = 0, ERROR_MESSAGE = NULL, STARTED_AT = #{startedAt}, FINISHED_AT = NULL
+        WHERE BATCH_NO = #{batchNo}
+    </update>
+    <update id="finish">
+        UPDATE PT_IMPORT_BATCH SET STATUS = #{status}, TOTAL_COUNT = #{totalCount}, SUCCESS_COUNT = #{successCount},
+            ERROR_MESSAGE = #{errorMessage}, FINISHED_AT = #{finishedAt} WHERE BATCH_NO = #{batchNo}
+    </update>
+    <select id="findRecent" resultType="com.qianfan.tag.domain.ImportBatch">
+        SELECT * FROM (
+            SELECT ID, BATCH_NO, FILE_NAME, STATUS, TOTAL_COUNT, SUCCESS_COUNT, ERROR_MESSAGE,
+                   STARTED_AT, FINISHED_AT, ROW_NUMBER() OVER (ORDER BY STARTED_AT DESC, ID) AS RN
+            FROM PT_IMPORT_BATCH
+        ) PAGE_DATA WHERE PAGE_DATA.RN &lt;= #{limit} ORDER BY PAGE_DATA.RN
+    </select>
+</mapper>

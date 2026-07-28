@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qianfan.tag.mapper.StructuredRuleMapper">
+    <select id="findMaxVersion" resultType="integer">
+        SELECT MAX(VERSION_NO) FROM PT_TAG_RULE_SET WHERE TAG_ID = #{tagId}
+    </select>
+    <insert id="insertRuleSet">
+        INSERT INTO PT_TAG_RULE_SET
+        (ID, TAG_ID, VERSION_NO, MATCH_MODE, STATUS, PUBLISHED_AT, CREATED_AT, UPDATED_AT)
+        VALUES (#{id}, #{tagId}, #{version}, #{matchMode}, #{status}, #{publishedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+    <insert id="insertCondition">
+        INSERT INTO PT_TAG_RULE_CONDITION
+        (ID, RULE_SET_ID, INDICATOR_ID, OPERATOR_CODE, EXPECTED_VALUES, SORT_NO, CREATED_AT)
+        VALUES (#{id}, #{ruleSetId}, #{indicatorId}, #{operator}, #{expectedValues}, #{sortNo}, #{createdAt})
+    </insert>
+    <select id="findRuleSet" resultType="com.qianfan.tag.domain.TagRuleSet">
+        SELECT ID, TAG_ID, VERSION_NO AS VERSION, MATCH_MODE, STATUS, PUBLISHED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_TAG_RULE_SET WHERE ID = #{id}
+    </select>
+    <select id="findRuleSets" resultType="com.qianfan.tag.domain.TagRuleSet">
+        SELECT ID, TAG_ID, VERSION_NO AS VERSION, MATCH_MODE, STATUS, PUBLISHED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_TAG_RULE_SET ORDER BY UPDATED_AT DESC, ID
+    </select>
+    <select id="findPublishedRuleSets" resultType="com.qianfan.tag.domain.TagRuleSet">
+        SELECT ID, TAG_ID, VERSION_NO AS VERSION, MATCH_MODE, STATUS, PUBLISHED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_TAG_RULE_SET WHERE STATUS = 'PUBLISHED' ORDER BY TAG_ID
+    </select>
+    <select id="findConditions" resultType="com.qianfan.tag.domain.TagRuleCondition">
+        SELECT ID, RULE_SET_ID, INDICATOR_ID, OPERATOR_CODE AS OPERATOR, EXPECTED_VALUES, SORT_NO, CREATED_AT
+        FROM PT_TAG_RULE_CONDITION WHERE RULE_SET_ID = #{ruleSetId} ORDER BY SORT_NO, ID
+    </select>
+    <update id="disablePublishedByTag">
+        UPDATE PT_TAG_RULE_SET SET STATUS = 'DISABLED', UPDATED_AT = #{updatedAt}
+        WHERE TAG_ID = #{tagId} AND STATUS = 'PUBLISHED'
+    </update>
+    <update id="publishRuleSet">
+        UPDATE PT_TAG_RULE_SET SET STATUS = 'PUBLISHED', PUBLISHED_AT = #{publishedAt}, UPDATED_AT = #{publishedAt}
+        WHERE ID = #{id} AND STATUS = 'DRAFT'
+    </update>
+    <select id="findBatchByNo" resultType="com.qianfan.tag.domain.RuleEvaluationBatch">
+        SELECT ID, BATCH_NO, RULE_SET_ID, STATUS, SCANNED_COUNT, MATCHED_COUNT, EXPIRED_COUNT,
+               ERROR_MESSAGE, STARTED_AT, FINISHED_AT
+        FROM PT_RULE_EVAL_BATCH WHERE BATCH_NO = #{batchNo}
+    </select>
+    <insert id="insertBatch">
+        INSERT INTO PT_RULE_EVAL_BATCH
+        (ID, BATCH_NO, RULE_SET_ID, STATUS, SCANNED_COUNT, MATCHED_COUNT, EXPIRED_COUNT,
+         ERROR_MESSAGE, STARTED_AT, FINISHED_AT)
+        VALUES (#{id}, #{batchNo}, #{ruleSetId}, #{status}, #{scannedCount}, #{matchedCount},
+                #{expiredCount}, #{errorMessage}, #{startedAt}, #{finishedAt})
+    </insert>
+    <update id="updateBatchProgress">
+        UPDATE PT_RULE_EVAL_BATCH SET SCANNED_COUNT = SCANNED_COUNT + #{scanned},
+            MATCHED_COUNT = MATCHED_COUNT + #{matched}, EXPIRED_COUNT = EXPIRED_COUNT + #{expired}
+        WHERE BATCH_NO = #{batchNo}
+    </update>
+    <update id="finishBatch">
+        UPDATE PT_RULE_EVAL_BATCH SET STATUS = #{status}, ERROR_MESSAGE = #{errorMessage}, FINISHED_AT = #{finishedAt}
+        WHERE BATCH_NO = #{batchNo}
+    </update>
+    <update id="restartBatch">
+        UPDATE PT_RULE_EVAL_BATCH SET STATUS = 'RUNNING', SCANNED_COUNT = 0, MATCHED_COUNT = 0,
+            EXPIRED_COUNT = 0, ERROR_MESSAGE = NULL, STARTED_AT = #{startedAt}, FINISHED_AT = NULL
+        WHERE BATCH_NO = #{batchNo}
+    </update>
+    <select id="findEvidence" resultType="com.qianfan.tag.domain.PersonTagEvidence">
+        SELECT ID, PERSON_ID, TAG_ID, SOURCE_TYPE, RULE_SET_ID, RULE_VERSION, BATCH_NO, MATCH_DETAIL,
+               EVIDENCE_STATUS, REVIEW_STATUS, REVIEWED_BY, REVIEWED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON_TAG_EVIDENCE
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId}
+          AND RULE_SET_ID = #{ruleSetId} AND RULE_VERSION = #{ruleVersion}
+    </select>
+    <insert id="insertEvidence">
+        INSERT INTO PT_PERSON_TAG_EVIDENCE
+        (ID, PERSON_ID, TAG_ID, SOURCE_TYPE, RULE_SET_ID, RULE_VERSION, BATCH_NO, MATCH_DETAIL,
+         EVIDENCE_STATUS, REVIEW_STATUS, REVIEWED_BY, REVIEWED_AT, CREATED_AT, UPDATED_AT)
+        VALUES (#{id}, #{personId}, #{tagId}, #{sourceType}, #{ruleSetId}, #{ruleVersion}, #{batchNo},
+                #{matchDetail}, #{evidenceStatus}, #{reviewStatus}, #{reviewedBy}, #{reviewedAt},
+                #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateEvidence">
+        UPDATE PT_PERSON_TAG_EVIDENCE SET BATCH_NO = #{batchNo}, MATCH_DETAIL = #{matchDetail},
+            EVIDENCE_STATUS = #{evidenceStatus}, REVIEW_STATUS = #{reviewStatus},
+            REVIEWED_BY = #{reviewedBy}, REVIEWED_AT = #{reviewedAt}, UPDATED_AT = #{updatedAt}
+        WHERE ID = #{id}
+    </update>
+    <update id="expireActiveEvidence">
+        UPDATE PT_PERSON_TAG_EVIDENCE SET EVIDENCE_STATUS = 'EXPIRED', UPDATED_AT = #{updatedAt}
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId} AND RULE_SET_ID = #{ruleSetId}
+          AND EVIDENCE_STATUS = 'ACTIVE'
+    </update>
+    <select id="countActiveRuleEvidence" resultType="integer">
+        SELECT COUNT(1) FROM PT_PERSON_TAG_EVIDENCE
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId} AND SOURCE_TYPE = 'RULE'
+          AND EVIDENCE_STATUS = 'ACTIVE' AND REVIEW_STATUS IN ('PENDING', 'APPROVED')
+    </select>
+    <update id="reviewActiveEvidence">
+        UPDATE PT_PERSON_TAG_EVIDENCE SET REVIEW_STATUS = #{reviewStatus}, REVIEWED_BY = #{reviewedBy},
+            REVIEWED_AT = #{reviewedAt}, UPDATED_AT = #{reviewedAt}
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId} AND RULE_SET_ID = #{ruleSetId}
+          AND EVIDENCE_STATUS = 'ACTIVE'
+    </update>
+    <delete id="deleteEvidenceForBinding">
+        DELETE FROM PT_PERSON_TAG_EVIDENCE
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId} AND RULE_SET_ID = #{ruleSetId}
+    </delete>
+    <update id="expireOtherRuleVersions">
+        UPDATE PT_PERSON_TAG_EVIDENCE SET EVIDENCE_STATUS = 'EXPIRED', UPDATED_AT = #{updatedAt}
+        WHERE TAG_ID = #{tagId} AND SOURCE_TYPE = 'RULE' AND RULE_SET_ID &lt;&gt; #{activeRuleSetId}
+          AND EVIDENCE_STATUS = 'ACTIVE'
+    </update>
+    <update id="expireOrphanRuleBindings">
+        UPDATE PT_PERSON_TAG PT SET PT.STATUS = 'EXPIRED', PT.UPDATED_AT = #{updatedAt}
+        WHERE PT.TAG_ID = #{tagId} AND PT.SOURCE_TYPE = 'RULE'
+          AND NOT EXISTS (
+              SELECT 1 FROM PT_PERSON_TAG_EVIDENCE E
+              WHERE E.PERSON_ID = PT.PERSON_ID AND E.TAG_ID = PT.TAG_ID
+                AND E.EVIDENCE_STATUS = 'ACTIVE' AND E.REVIEW_STATUS IN ('PENDING', 'APPROVED')
+          )
+    </update>
+</mapper>

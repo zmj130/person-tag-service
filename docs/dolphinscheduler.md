@@ -17,8 +17,24 @@
 ## 推荐工作流
 
 ```text
-人员增量同步 -> 校验同步结果 -> 后续统计任务（可选）
+人员增量同步 -> 结构化规则重算（按需或夜间） -> ES 画像重建（启用 ES 时）
 ```
 
-Trie 自动打标已经包含在每页同步事务中，第一版不需要再创建一个独立“计算标签”任务，避免人员数据和规则标签之间出现时间窗口。
+人员增量同步会立即计算该批发生变化的人员，包括兼容 Trie 和所有已发布结构化规则。规则发布后，即使人员没有变化，也可在规则管理页点击“重算”，或由调度调用下面的接口扫描存量人员：
 
+```http
+POST /internal/sync/rules/recalculate
+X-Scheduler-Token: ${schedulerToken}
+Content-Type: application/json
+
+{"batchNo":"RULE_${system.biz.date}_${system.task.instance.id}"}
+```
+
+ES 采用显式全量重建。只有设置 `ES_ENABLED=true` 后才配置这一步；未启用时接口会返回 `ES_DISABLED`，不会连接远端集群。
+
+```http
+POST /internal/sync/profiles/rebuild
+X-Scheduler-Token: ${schedulerToken}
+```
+
+规则重算会对每个已发布规则生成子批次，重试必须复用同一个父批次号。演示环境建议人员同步按业务频率运行、全部规则重算每天一次或规则发布后运行、ES 重建放在规则任务成功之后；三个任务最大并行度均设为 1。

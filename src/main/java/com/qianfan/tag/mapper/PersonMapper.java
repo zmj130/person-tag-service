@@ -16,5 +16,5 @@ public interface PersonMapper {
     List<PersonRecord> search(@Param("keyword") String keyword, @Param("tagIds") List<String> tagIds,
                               @Param("andMode") boolean andMode, @Param("tagCount") int tagCount,
                               @Param("offset") int offset, @Param("endRow") int endRow);
+    List<PersonRecord> findActivePage(@Param("offset") int offset, @Param("endRow") int endRow);
 }
-

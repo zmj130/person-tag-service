@@ -15,6 +15,10 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
 mybatis:
   mapper-locations: classpath:/mapper/*.xml
   configuration:
@@ -31,7 +35,13 @@ remote-person:
 scheduler:
   # DolphinScheduler 调用内部任务接口时必须携带 X-Scheduler-Token。
   token: ${SCHEDULER_TOKEN:local-demo-token}
+profile-search:
+  enabled: ${ES_ENABLED:true}
+  url: ${ES_URL:http://127.0.0.1:9200}
+  index: ${ES_INDEX:person_tag_resume_demo_v1}
+  username: ${ES_USERNAME:}
+  password: ${ES_PASSWORD:}
+  max-documents: ${ES_MAX_DOCUMENTS:5000}
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
-

@@ -68,4 +68,15 @@
         WHERE PAGE_DATA.RN &gt; #{offset} AND PAGE_DATA.RN &lt;= #{endRow}
         ORDER BY PAGE_DATA.RN
     </select>
+
+    <select id="findActivePage" resultType="com.qianfan.tag.domain.PersonRecord">
+        SELECT * FROM (
+            SELECT P.ID, P.EXTERNAL_ID, P.NAME, P.GENDER, P.ORGANIZATION, P.OCCUPATION,
+                   P.ADDRESS, P.REMARK, P.SOURCE_UPDATED_AT, P.DELETED_FLAG AS DELETED,
+                   P.CREATED_AT, P.UPDATED_AT, ROW_NUMBER() OVER (ORDER BY P.ID) AS RN
+            FROM PT_PERSON P WHERE P.DELETED_FLAG = 0
+        ) PAGE_DATA
+        WHERE PAGE_DATA.RN &gt; #{offset} AND PAGE_DATA.RN &lt;= #{endRow}
+        ORDER BY PAGE_DATA.RN
+    </select>
 </mapper>

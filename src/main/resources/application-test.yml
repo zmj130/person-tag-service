@@ -14,3 +14,6 @@ remote-person:
   mode: mock
 scheduler:
   token: test-token
+profile-search:
+  enabled: false
+  max-documents: 5000

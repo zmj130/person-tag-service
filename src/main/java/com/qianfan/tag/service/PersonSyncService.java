@@ -5,12 +5,15 @@ import com.qianfan.tag.common.Ids;
 import com.qianfan.tag.config.RemotePersonProperties;
 import com.qianfan.tag.domain.SyncBatch;
 import com.qianfan.tag.dto.SyncRequest;
+import com.qianfan.tag.dto.PageResult;
 import com.qianfan.tag.mapper.SyncMapper;
 import com.qianfan.tag.remote.RemotePersonClient;
 import com.qianfan.tag.remote.RemotePersonPage;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.util.Collections;
+import java.util.List;
 
 /** DolphinScheduler 调用的增量同步编排服务。 */
 @Service
@@ -68,6 +71,21 @@ public class PersonSyncService {
             throw ex;
         }
         return syncMapper.findBatchByNo(request.getBatchNo());
+    }
+
+    public PageResult<SyncBatch> listBatches(String status, int pageNo, int pageSize) {
+        if (pageNo < 1 || pageSize < 1 || pageSize > 200) {
+            throw new BusinessException("INVALID_PAGE", "页码必须大于 0，分页大小范围为 1 到 200");
+        }
+        if (status != null && !"RUNNING".equals(status) && !"SUCCESS".equals(status)
+                && !"FAILED".equals(status)) {
+            throw new BusinessException("INVALID_SYNC_STATUS", "同步状态不合法");
+        }
+        int offset = (pageNo - 1) * pageSize;
+        long total = syncMapper.countBatches(status);
+        List<SyncBatch> records = total == 0 ? Collections.<SyncBatch>emptyList()
+                : syncMapper.findBatches(status, offset, offset + pageSize);
+        return new PageResult<SyncBatch>(total, pageNo, pageSize, records);
     }
 
     private SyncBatch newBatch(String batchNo, String cursor) {

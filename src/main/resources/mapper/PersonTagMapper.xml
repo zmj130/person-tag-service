@@ -16,10 +16,40 @@
         FROM PT_PERSON_TAG WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId}
     </select>
 
+    <select id="findById" resultType="com.qianfan.tag.domain.PersonTag">
+        SELECT ID, PERSON_ID, TAG_ID, SOURCE_TYPE AS SOURCE, STATUS, RULE_ID, BATCH_NO,
+               MATCHED_KEYWORD, REVIEWED_BY, REVIEWED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON_TAG WHERE ID = #{id}
+    </select>
+
     <select id="findByPersonId" resultType="com.qianfan.tag.domain.PersonTag">
         SELECT ID, PERSON_ID, TAG_ID, SOURCE_TYPE AS SOURCE, STATUS, RULE_ID, BATCH_NO,
                MATCHED_KEYWORD, REVIEWED_BY, REVIEWED_AT, CREATED_AT, UPDATED_AT
         FROM PT_PERSON_TAG WHERE PERSON_ID = #{personId} ORDER BY CREATED_AT
+    </select>
+
+    <select id="countReviews" resultType="long">
+        SELECT COUNT(1) FROM PT_PERSON_TAG PT
+        WHERE (#{status} IS NULL OR PT.STATUS = #{status})
+    </select>
+
+    <select id="findReviews" resultType="com.qianfan.tag.dto.ReviewItem">
+        SELECT * FROM (
+            SELECT PT.ID, PT.PERSON_ID, P.NAME AS PERSON_NAME, P.EXTERNAL_ID,
+                   PT.TAG_ID, T.NAME AS TAG_NAME, T.CATEGORY AS TAG_CATEGORY,
+                   PT.SOURCE_TYPE AS SOURCE, PT.STATUS, PT.MATCHED_KEYWORD, PT.BATCH_NO,
+                   E.MATCH_DETAIL, PT.REVIEWED_BY, PT.REVIEWED_AT, PT.CREATED_AT,
+                   ROW_NUMBER() OVER (ORDER BY PT.CREATED_AT DESC, PT.ID) AS RN
+            FROM PT_PERSON_TAG PT
+            JOIN PT_PERSON P ON P.ID = PT.PERSON_ID
+            JOIN PT_TAG_DEFINITION T ON T.ID = PT.TAG_ID
+            LEFT JOIN PT_PERSON_TAG_EVIDENCE E
+              ON E.PERSON_ID = PT.PERSON_ID AND E.TAG_ID = PT.TAG_ID
+             AND E.RULE_SET_ID = PT.RULE_ID AND E.EVIDENCE_STATUS = 'ACTIVE'
+            WHERE (#{status} IS NULL OR PT.STATUS = #{status})
+        ) PAGE_DATA
+        WHERE PAGE_DATA.RN &gt; #{offset} AND PAGE_DATA.RN &lt;= #{endRow}
+        ORDER BY PAGE_DATA.RN
     </select>
 
     <update id="updateBinding">
@@ -48,6 +78,7 @@
     <delete id="deleteStaleRuleBindings">
         DELETE FROM PT_PERSON_TAG
         WHERE PERSON_ID = #{personId} AND SOURCE_TYPE = 'RULE' AND STATUS != 'REJECTED'
+          AND RULE_ID IN (SELECT ID FROM PT_TAG_RULE)
         <if test="matchedTagIds != null and matchedTagIds.size() > 0">
             AND TAG_ID NOT IN
             <foreach collection="matchedTagIds" item="tagId" open="(" separator="," close=")">
@@ -55,4 +86,13 @@
             </foreach>
         </if>
     </delete>
+
+    <delete id="deleteRuleBindingById">
+        DELETE FROM PT_PERSON_TAG WHERE ID = #{id} AND SOURCE_TYPE = 'RULE'
+    </delete>
+
+    <update id="expireRuleBinding">
+        UPDATE PT_PERSON_TAG SET STATUS = 'EXPIRED', UPDATED_AT = #{updatedAt}
+        WHERE PERSON_ID = #{personId} AND TAG_ID = #{tagId} AND SOURCE_TYPE = 'RULE'
+    </update>
 </mapper>

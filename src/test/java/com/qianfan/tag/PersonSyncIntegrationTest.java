@@ -23,6 +23,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,6 +73,19 @@ class PersonSyncIntegrationTest {
                 .andExpect(jsonPath("$.data.successCount").value(2));
         assertThat(personTagMapper.findByPersonId(person.getId())).hasSize(2);
 
+        mockMvc.perform(get("/api/persons/tag-bindings/reviews")
+                        .param("status", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].personName").value("示例甲"))
+                .andExpect(jsonPath("$.data.records[0].tagName").value("运输从业人员"));
+
+        mockMvc.perform(get("/api/sync/batches"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].batchNo").value("TEST-BATCH-001"))
+                .andExpect(jsonPath("$.data.records[0].status").value("SUCCESS"));
+
         PersonRequests.Search search = new PersonRequests.Search();
         search.setTagIds(Arrays.asList("10000000000000000000000000000002"));
         assertThat(personService.search(search).getTotal()).isEqualTo(1);
@@ -86,5 +100,25 @@ class PersonSyncIntegrationTest {
         personService.upsert(changed);
         assertThat(personTagMapper.findByPersonId(person.getId()))
                 .noneMatch(item -> "RULE".equals(item.getSource()));
+    }
+
+    @Test
+    void shouldUpdateGenderWhenBrowserReturnsAnOlderSourceTimestamp() throws Exception {
+        PersonRequests.UpsertPerson initial = new PersonRequests.UpsertPerson();
+        initial.setExternalId("MANUAL-GENDER-001");
+        initial.setName("性别修改测试人员");
+        initial.setGender("男");
+        personService.upsert(initial);
+
+        String body = "{\"externalId\":\"MANUAL-GENDER-001\","
+                + "\"name\":\"性别修改测试人员\",\"gender\":\"女\","
+                + "\"sourceUpdatedAt\":\"2000-01-01 00:00:00\"}";
+        mockMvc.perform(post("/api/persons")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.gender").value("女"));
+
+        assertThat(personMapper.findByExternalId("MANUAL-GENDER-001").getGender()).isEqualTo("女");
     }
 }

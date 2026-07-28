@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qianfan.tag.mapper.IndicatorMapper">
+    <insert id="insertDefinition">
+        INSERT INTO PT_INDICATOR_DEFINITION
+        (ID, CODE, NAME, DATA_TYPE, SOURCE_TYPE, PERSON_FIELD, UNIT, STATUS, CREATED_AT, UPDATED_AT)
+        VALUES (#{id}, #{code}, #{name}, #{dataType}, #{sourceType}, #{personField}, #{unit}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+    <select id="findDefinitionById" resultType="com.qianfan.tag.domain.IndicatorDefinition">
+        SELECT ID, CODE, NAME, DATA_TYPE, SOURCE_TYPE, PERSON_FIELD, UNIT, STATUS, CREATED_AT, UPDATED_AT
+        FROM PT_INDICATOR_DEFINITION WHERE ID = #{id}
+    </select>
+    <select id="findDefinitionByCode" resultType="com.qianfan.tag.domain.IndicatorDefinition">
+        SELECT ID, CODE, NAME, DATA_TYPE, SOURCE_TYPE, PERSON_FIELD, UNIT, STATUS, CREATED_AT, UPDATED_AT
+        FROM PT_INDICATOR_DEFINITION WHERE CODE = #{code}
+    </select>
+    <select id="findDefinitions" resultType="com.qianfan.tag.domain.IndicatorDefinition">
+        SELECT ID, CODE, NAME, DATA_TYPE, SOURCE_TYPE, PERSON_FIELD, UNIT, STATUS, CREATED_AT, UPDATED_AT
+        FROM PT_INDICATOR_DEFINITION
+        <if test="enabledOnly">WHERE STATUS = 1</if>
+        ORDER BY CODE
+    </select>
+    <update id="updateDefinitionStatus">
+        UPDATE PT_INDICATOR_DEFINITION SET STATUS = #{status}, UPDATED_AT = #{updatedAt} WHERE ID = #{id}
+    </update>
+    <insert id="insertOption">
+        INSERT INTO PT_INDICATOR_OPTION
+        (ID, INDICATOR_ID, OPTION_CODE, OPTION_LABEL, SORT_NO, STATUS, CREATED_AT, UPDATED_AT)
+        VALUES (#{id}, #{indicatorId}, #{code}, #{label}, #{sortNo}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+    <select id="findOption" resultType="com.qianfan.tag.domain.IndicatorOption">
+        SELECT ID, INDICATOR_ID, OPTION_CODE AS CODE, OPTION_LABEL AS LABEL, SORT_NO, STATUS, CREATED_AT, UPDATED_AT
+        FROM PT_INDICATOR_OPTION WHERE INDICATOR_ID = #{indicatorId} AND OPTION_CODE = #{code}
+    </select>
+    <select id="findOptions" resultType="com.qianfan.tag.domain.IndicatorOption">
+        SELECT ID, INDICATOR_ID, OPTION_CODE AS CODE, OPTION_LABEL AS LABEL, SORT_NO, STATUS, CREATED_AT, UPDATED_AT
+        FROM PT_INDICATOR_OPTION WHERE INDICATOR_ID = #{indicatorId}
+        <if test="enabledOnly">AND STATUS = 1</if>
+        ORDER BY SORT_NO, OPTION_CODE
+    </select>
+    <update id="updateOptionStatus">
+        UPDATE PT_INDICATOR_OPTION SET STATUS = #{status}, UPDATED_AT = #{updatedAt} WHERE ID = #{id}
+    </update>
+    <select id="findPersonValue" resultType="com.qianfan.tag.domain.PersonIndicatorValue">
+        SELECT ID, PERSON_ID, INDICATOR_ID, STRING_VALUE, NUMBER_VALUE, DATE_VALUE, BOOLEAN_VALUE,
+               OPTION_CODE, PERIOD_START, PERIOD_END, SOURCE_TYPE, IMPORT_BATCH_NO,
+               SOURCE_UPDATED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON_INDICATOR WHERE PERSON_ID = #{personId} AND INDICATOR_ID = #{indicatorId}
+    </select>
+    <select id="findPersonValues" resultType="com.qianfan.tag.domain.PersonIndicatorValue">
+        SELECT ID, PERSON_ID, INDICATOR_ID, STRING_VALUE, NUMBER_VALUE, DATE_VALUE, BOOLEAN_VALUE,
+               OPTION_CODE, PERIOD_START, PERIOD_END, SOURCE_TYPE, IMPORT_BATCH_NO,
+               SOURCE_UPDATED_AT, CREATED_AT, UPDATED_AT
+        FROM PT_PERSON_INDICATOR WHERE PERSON_ID = #{personId} ORDER BY INDICATOR_ID
+    </select>
+    <insert id="insertPersonValue">
+        INSERT INTO PT_PERSON_INDICATOR
+        (ID, PERSON_ID, INDICATOR_ID, STRING_VALUE, NUMBER_VALUE, DATE_VALUE, BOOLEAN_VALUE,
+         OPTION_CODE, PERIOD_START, PERIOD_END, SOURCE_TYPE, IMPORT_BATCH_NO, SOURCE_UPDATED_AT,
+         CREATED_AT, UPDATED_AT)
+        VALUES (#{id}, #{personId}, #{indicatorId}, #{stringValue}, #{numberValue}, #{dateValue},
+                #{booleanValue}, #{optionCode}, #{periodStart}, #{periodEnd}, #{sourceType},
+                #{importBatchNo}, #{sourceUpdatedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updatePersonValue">
+        UPDATE PT_PERSON_INDICATOR SET STRING_VALUE = #{stringValue}, NUMBER_VALUE = #{numberValue},
+            DATE_VALUE = #{dateValue}, BOOLEAN_VALUE = #{booleanValue}, OPTION_CODE = #{optionCode},
+            PERIOD_START = #{periodStart}, PERIOD_END = #{periodEnd}, SOURCE_TYPE = #{sourceType},
+            IMPORT_BATCH_NO = #{importBatchNo}, SOURCE_UPDATED_AT = #{sourceUpdatedAt}, UPDATED_AT = #{updatedAt}
+        WHERE ID = #{id}
+    </update>
+</mapper>

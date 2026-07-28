@@ -5,6 +5,7 @@ import com.qianfan.tag.domain.PersonRecord;
 import com.qianfan.tag.domain.PersonTag;
 import com.qianfan.tag.dto.PageResult;
 import com.qianfan.tag.dto.PersonRequests;
+import com.qianfan.tag.dto.ReviewItem;
 import com.qianfan.tag.service.PersonService;
 import com.qianfan.tag.service.PersonTagService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
@@ -75,5 +77,23 @@ public class PersonController {
                                     @Valid @RequestBody PersonRequests.ReviewTag request) {
         personTagService.review(bindingId, request.getStatus(), request.getReviewer());
         return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/tag-bindings/{bindingId}")
+    public ApiResponse<Void> deleteRuleResult(@PathVariable String bindingId) {
+        personTagService.deleteRuleResult(bindingId);
+        return ApiResponse.success(null);
+    }
+
+    @GetMapping("/tag-bindings/reviews")
+    public ApiResponse<PageResult<ReviewItem>> listReviews(
+            @RequestParam(value = "status", required = false, defaultValue = "PENDING") String status,
+            @RequestParam(value = "pageNo", defaultValue = "1") int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = "20") int pageSize) {
+        return ApiResponse.success(personTagService.listReviews(emptyToNull(status), pageNo, pageSize));
+    }
+
+    private String emptyToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value;
     }
 }

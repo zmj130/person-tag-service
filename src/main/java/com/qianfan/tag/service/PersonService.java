@@ -19,10 +19,13 @@ import java.util.List;
 public class PersonService {
     private final PersonMapper personMapper;
     private final PersonTagService personTagService;
+    private final StructuredRuleService structuredRuleService;
 
-    public PersonService(PersonMapper personMapper, PersonTagService personTagService) {
+    public PersonService(PersonMapper personMapper, PersonTagService personTagService,
+                         StructuredRuleService structuredRuleService) {
         this.personMapper = personMapper;
         this.personTagService = personTagService;
+        this.structuredRuleService = structuredRuleService;
     }
 
     @Transactional
@@ -35,9 +38,11 @@ public class PersonService {
         remote.setOccupation(request.getOccupation());
         remote.setAddress(request.getAddress());
         remote.setRemark(request.getRemark());
-        remote.setUpdatedAt(request.getSourceUpdatedAt() == null ? new Date() : request.getSourceUpdatedAt());
+        // 人工维护是一次新的本地变更，不能沿用页面回传的旧上游版本时间。
+        remote.setUpdatedAt(new Date());
         PersonRecord person = upsertRemote(remote);
         personTagService.applyRules(person, "MANUAL_UPSERT");
+        structuredRuleService.evaluatePublishedForPerson(person, "MANUAL_UPSERT");
         return person;
     }
 
@@ -98,4 +103,3 @@ public class PersonService {
         return new PageResult<PersonRecord>(total, pageNo, pageSize, records);
     }
 }
-
