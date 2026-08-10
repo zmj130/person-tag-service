@@ -11,8 +11,12 @@ import java.util.List;
 public interface PersonTagMapper {
     int insert(PersonTag personTag);
     PersonTag find(@Param("personId") String personId, @Param("tagId") String tagId);
+    PersonTag findBySource(@Param("personId") String personId, @Param("tagId") String tagId,
+                           @Param("sourceRef") String sourceRef);
     PersonTag findById(@Param("id") String id);
     List<PersonTag> findByPersonId(@Param("personId") String personId);
+    List<String> findPersonIdsByTag(@Param("tagId") String tagId);
+    List<String> findPersonIdsByRule(@Param("ruleId") String ruleId);
     long countReviews(@Param("status") String status);
     List<ReviewItem> findReviews(@Param("status") String status,
                                  @Param("offset") int offset, @Param("endRow") int endRow);
@@ -22,8 +26,10 @@ public interface PersonTagMapper {
     int deleteManual(@Param("personId") String personId, @Param("tagId") String tagId);
     int deleteRemote(@Param("personId") String personId, @Param("tagId") String tagId);
     int deleteStaleRuleBindings(@Param("personId") String personId,
-                                @Param("matchedTagIds") List<String> matchedTagIds);
+                                @Param("matchedRuleIds") List<String> matchedRuleIds);
+    int deleteKeywordRuleBindings(@Param("ruleId") String ruleId);
     int deleteRuleBindingById(@Param("id") String id);
     int expireRuleBinding(@Param("personId") String personId, @Param("tagId") String tagId,
+                          @Param("sourceRef") String sourceRef,
                           @Param("updatedAt") java.util.Date updatedAt);
 }

@@ -35,6 +35,19 @@
         UPDATE PT_TAG_DEFINITION SET STATUS = #{status}, UPDATED_AT = #{updatedAt} WHERE ID = #{id}
     </update>
 
+    <select id="countTagReferences" resultType="integer">
+        SELECT
+            (SELECT COUNT(1) FROM PT_TAG_RULE WHERE TAG_ID = #{id})
+          + (SELECT COUNT(1) FROM PT_TAG_RULE_SET WHERE TAG_ID = #{id})
+          + (SELECT COUNT(1) FROM PT_PERSON_TAG WHERE TAG_ID = #{id})
+          + (SELECT COUNT(1) FROM PT_PERSON_TAG_EVIDENCE WHERE TAG_ID = #{id})
+        FROM DUAL
+    </select>
+
+    <delete id="deleteTag">
+        DELETE FROM PT_TAG_DEFINITION WHERE ID = #{id}
+    </delete>
+
     <insert id="insertRule">
         INSERT INTO PT_TAG_RULE
         (ID, TAG_ID, KEYWORD, NORMALIZED_KEYWORD, STATUS, VERSION_NO, CREATED_AT, UPDATED_AT)
@@ -57,6 +70,10 @@
         UPDATE PT_TAG_RULE SET STATUS = #{status}, VERSION_NO = VERSION_NO + 1, UPDATED_AT = #{updatedAt}
         WHERE ID = #{id}
     </update>
+
+    <delete id="deleteRule">
+        DELETE FROM PT_TAG_RULE WHERE ID = #{id}
+    </delete>
 
     <select id="findRulesByTagId" resultType="com.qianfan.tag.domain.TagRule">
         SELECT ID, TAG_ID, KEYWORD, NORMALIZED_KEYWORD, STATUS, VERSION_NO AS VERSION, CREATED_AT, UPDATED_AT

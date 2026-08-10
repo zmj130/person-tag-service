@@ -15,9 +15,14 @@ import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DataValidation;
 import org.apache.poi.ss.usermodel.DataValidationConstraint;
 import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Name;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddressList;
@@ -46,9 +51,15 @@ import java.util.Set;
 @Service
 public class PersonExcelImportService {
     private static final int MAX_ROWS = 10000;
+    private static final int HEADER_ROW_INDEX = 0;
+    private static final int DESCRIPTION_ROW_INDEX = 1;
+    private static final int DATA_START_ROW_INDEX = 2;
     private static final long MAX_FILE_SIZE = 20L * 1024L * 1024L;
     private static final List<String> BASE_HEADERS = Arrays.asList(
             "external_id", "name", "gender", "organization", "occupation", "address", "remark", "deleted");
+    private static final List<String> BASE_HEADER_LABELS = Arrays.asList(
+            "人员编码（必填）", "姓名（必填）", "性别（男/女/未知）", "所属机构",
+            "职业", "地区或地址", "备注", "是否删除（false/true）");
     private final IndicatorService indicatorService;
     private final ImportMapper importMapper;
     private final ImportWriteService writeService;
@@ -61,18 +72,37 @@ public class PersonExcelImportService {
     }
 
     public byte[] createTemplate() {
+        return createWorkbook(indicatorService.importDefinitions(), Collections.<Map<String, String>>emptyList());
+    }
+
+    public byte[] createExample() {
+        List<IndicatorDefinition> definitions = indicatorService.importDefinitions();
+        return createWorkbook(definitions, createExampleRows(definitions));
+    }
+
+    private byte[] createWorkbook(List<IndicatorDefinition> definitions, List<Map<String, String>> dataRows) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             XSSFSheet sheet = workbook.createSheet("人员导入");
             Sheet optionsSheet = workbook.createSheet("枚举选项");
             workbook.setSheetHidden(workbook.getSheetIndex(optionsSheet), true);
-            Row header = sheet.createRow(0);
+            Row header = sheet.createRow(HEADER_ROW_INDEX);
+            Row description = sheet.createRow(DESCRIPTION_ROW_INDEX);
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle descriptionStyle = createDescriptionStyle(workbook);
             int column = 0;
-            for (String name : BASE_HEADERS) header.createCell(column++).setCellValue(name);
-            List<IndicatorDefinition> definitions = indicatorService.importDefinitions();
-            for (IndicatorDefinition definition : definitions) header.createCell(column++).setCellValue(definition.getCode());
+            for (int i = 0; i < BASE_HEADERS.size(); i++) {
+                writeHeaderCell(header, column, BASE_HEADERS.get(i), headerStyle);
+                writeHeaderCell(description, column++, BASE_HEADER_LABELS.get(i), descriptionStyle);
+            }
+            for (IndicatorDefinition definition : definitions) {
+                writeHeaderCell(header, column, definition.getCode(), headerStyle);
+                writeHeaderCell(description, column++, indicatorLabel(definition), descriptionStyle);
+            }
 
-            sheet.createFreezePane(0, 1);
-            for (int i = 0; i < column; i++) sheet.setColumnWidth(i, i < 2 ? 5200 : 4200);
+            header.setHeightInPoints(24);
+            description.setHeightInPoints(42);
+            sheet.createFreezePane(0, DATA_START_ROW_INDEX);
+            applyColumnWidths(sheet, definitions, dataRows);
             addExplicitValidation(sheet, 2, new String[]{"男", "女", "未知"});
             addExplicitValidation(sheet, 7, new String[]{"false", "true"});
 
@@ -110,10 +140,11 @@ public class PersonExcelImportService {
                         : "DATETIME".equals(definition.getDataType()) ? dateTimeStyle : null;
                 if (style != null) sheet.setDefaultColumnStyle(targetColumn, style);
             }
+            writeDataRows(sheet, definitions, dataRows);
             workbook.write(output);
             return output.toByteArray();
         } catch (IOException ex) {
-            throw new BusinessException("TEMPLATE_CREATE_FAILED", "Excel模板生成失败");
+            throw new BusinessException("EXCEL_CREATE_FAILED", "Excel文件生成失败");
         }
     }
 
@@ -173,13 +204,16 @@ public class PersonExcelImportService {
                     throw new BusinessException("IMPORT_UNKNOWN_COLUMN", "Excel包含未知或未启用指标列：" + header);
                 }
             }
+            validateDescriptionRow(sheet.getRow(DESCRIPTION_ROW_INDEX), headers, indicatorByCode);
 
             List<PersonImportRow> rows = new ArrayList<PersonImportRow>();
             List<String> errors = new ArrayList<String>();
             Set<String> externalIds = new HashSet<String>();
             int lastRow = sheet.getLastRowNum();
-            if (lastRow > MAX_ROWS) throw new BusinessException("IMPORT_TOO_MANY_ROWS", "单次导入最多 " + MAX_ROWS + " 行");
-            for (int rowIndex = 1; rowIndex <= lastRow; rowIndex++) {
+            if (lastRow - DATA_START_ROW_INDEX + 1 > MAX_ROWS) {
+                throw new BusinessException("IMPORT_TOO_MANY_ROWS", "单次导入最多 " + MAX_ROWS + " 行数据");
+            }
+            for (int rowIndex = DATA_START_ROW_INDEX; rowIndex <= lastRow; rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
                 if (row == null || isBlankRow(row, headers.keySet())) continue;
                 try {
@@ -282,7 +316,8 @@ public class PersonExcelImportService {
     private void addExplicitValidation(XSSFSheet sheet, int column, String[] values) {
         XSSFDataValidationHelper helper = new XSSFDataValidationHelper(sheet);
         DataValidationConstraint constraint = helper.createExplicitListConstraint(values);
-        DataValidation validation = helper.createValidation(constraint, new CellRangeAddressList(1, MAX_ROWS, column, column));
+        DataValidation validation = helper.createValidation(constraint,
+                new CellRangeAddressList(DATA_START_ROW_INDEX, DATA_START_ROW_INDEX + MAX_ROWS - 1, column, column));
         validation.setShowErrorBox(true);
         sheet.addValidationData(validation);
     }
@@ -290,7 +325,8 @@ public class PersonExcelImportService {
     private void addFormulaValidation(XSSFSheet sheet, int column, String rangeName) {
         XSSFDataValidationHelper helper = new XSSFDataValidationHelper(sheet);
         DataValidationConstraint constraint = helper.createFormulaListConstraint(rangeName);
-        DataValidation validation = helper.createValidation(constraint, new CellRangeAddressList(1, MAX_ROWS, column, column));
+        DataValidation validation = helper.createValidation(constraint,
+                new CellRangeAddressList(DATA_START_ROW_INDEX, DATA_START_ROW_INDEX + MAX_ROWS - 1, column, column));
         validation.setShowErrorBox(true);
         sheet.addValidationData(validation);
     }
@@ -309,6 +345,155 @@ public class PersonExcelImportService {
         if (value == null || value.trim().isEmpty() || "false".equalsIgnoreCase(value) || "0".equals(value)) return false;
         if ("true".equalsIgnoreCase(value) || "1".equals(value)) return true;
         throw new BusinessException("IMPORT_DELETED_INVALID", "deleted只能是 true、false、1或0");
+    }
+
+    private List<Map<String, String>> createExampleRows(List<IndicatorDefinition> definitions) {
+        List<Map<String, String>> rows = new ArrayList<Map<String, String>>();
+        rows.add(examplePerson("IMPORT-SAMPLE-001", "导入示例-赵一", "男", "星海科技有限公司", "产品经理", "长沙市岳麓区", "人员导入示例数据"));
+        rows.add(examplePerson("IMPORT-SAMPLE-002", "导入示例-钱二", "女", "远山物流有限公司", "运营主管", "株洲市天元区", "可直接用于验证导入流程"));
+        rows.add(examplePerson("IMPORT-SAMPLE-003", "导入示例-孙三", "未知", "青禾教育中心", "讲师", "湘潭市雨湖区", "重复导入会按人员编码更新"));
+        for (IndicatorDefinition definition : definitions) {
+            List<IndicatorOption> options = "ENUM".equals(definition.getDataType())
+                    ? indicatorService.enabledOptions(definition.getId()) : Collections.<IndicatorOption>emptyList();
+            for (int row = 0; row < rows.size(); row++) {
+                rows.get(row).put(definition.getCode(), exampleIndicatorValue(definition, options, row));
+            }
+        }
+        return rows;
+    }
+
+    private Map<String, String> examplePerson(String externalId, String name, String gender,
+                                               String organization, String occupation, String address, String remark) {
+        Map<String, String> row = new LinkedHashMap<String, String>();
+        row.put("external_id", externalId);
+        row.put("name", name);
+        row.put("gender", gender);
+        row.put("organization", organization);
+        row.put("occupation", occupation);
+        row.put("address", address);
+        row.put("remark", remark);
+        row.put("deleted", "false");
+        return row;
+    }
+
+    private String exampleIndicatorValue(IndicatorDefinition definition, List<IndicatorOption> options, int row) {
+        if ("NUMBER".equals(definition.getDataType())) return exampleNumberValue(definition, row);
+        if ("BOOLEAN".equals(definition.getDataType())) return row == 1 ? "false" : "true";
+        if ("DATE".equals(definition.getDataType())) return Arrays.asList("2026-07-01", "2026-07-02", "2026-07-03").get(row);
+        if ("DATETIME".equals(definition.getDataType())) {
+            return Arrays.asList("2026-07-01 09:00:00", "2026-07-02 10:30:00", "2026-07-03 14:00:00").get(row);
+        }
+        if ("ENUM".equals(definition.getDataType())) {
+            return options.isEmpty() ? "" : options.get(row % options.size()).getCode();
+        }
+        return "示例值" + (row + 1);
+    }
+
+    private String exampleNumberValue(IndicatorDefinition definition, int row) {
+        String code = definition.getCode().toUpperCase(Locale.ROOT);
+        String unit = definition.getUnit() == null ? "" : definition.getUnit().trim();
+        if (code.contains("AGE") || "岁".equals(unit)) return Arrays.asList("28", "35", "42").get(row);
+        if (code.contains("FLOW") || code.contains("AMOUNT") || "元".equals(unit)) {
+            return Arrays.asList("12000000", "800000", "3500000").get(row);
+        }
+        return Arrays.asList("100", "200", "300").get(row);
+    }
+
+    private void writeDataRows(XSSFSheet sheet, List<IndicatorDefinition> definitions,
+                               List<Map<String, String>> dataRows) {
+        for (int index = 0; index < dataRows.size(); index++) {
+            Row row = sheet.createRow(DATA_START_ROW_INDEX + index);
+            int column = 0;
+            for (String header : BASE_HEADERS) row.createCell(column++).setCellValue(dataRows.get(index).get(header));
+            for (IndicatorDefinition definition : definitions) {
+                row.createCell(column++).setCellValue(dataRows.get(index).get(definition.getCode()));
+            }
+        }
+    }
+
+    private void validateDescriptionRow(Row row, Map<Integer, String> headers,
+                                        Map<String, IndicatorDefinition> indicatorByCode) {
+        if (row == null) throw new BusinessException("IMPORT_DESCRIPTION_MISSING", "Excel第二行必须填写中文字段说明");
+        for (Map.Entry<Integer, String> entry : headers.entrySet()) {
+            IndicatorDefinition definition = indicatorByCode.get(entry.getValue());
+            String expected = definition == null ? BASE_HEADER_LABELS.get(BASE_HEADERS.indexOf(entry.getValue()))
+                    : indicatorLabel(definition);
+            if (!expected.equals(readText(row.getCell(entry.getKey())))) {
+                throw new BusinessException("IMPORT_DESCRIPTION_MISSING", "Excel第二行中文说明与当前模板不一致，请重新下载模板");
+            }
+        }
+    }
+
+    private void applyColumnWidths(XSSFSheet sheet, List<IndicatorDefinition> definitions,
+                                   List<Map<String, String>> dataRows) {
+        int column = 0;
+        for (int i = 0; i < BASE_HEADERS.size(); i++) {
+            sheet.setColumnWidth(column++, columnWidth(BASE_HEADERS.get(i), BASE_HEADER_LABELS.get(i), dataRows));
+        }
+        for (IndicatorDefinition definition : definitions) {
+            sheet.setColumnWidth(column++, columnWidth(definition.getCode(), indicatorLabel(definition), dataRows));
+        }
+    }
+
+    private int columnWidth(String header, String label, List<Map<String, String>> dataRows) {
+        int length = Math.max(displayLength(header), displayLength(label));
+        for (Map<String, String> row : dataRows) length = Math.max(length, displayLength(row.get(header)));
+        return Math.min(32, Math.max(14, length + 3)) * 256;
+    }
+
+    private int displayLength(String value) {
+        if (value == null) return 0;
+        int length = 0;
+        for (int index = 0; index < value.length(); index++) length += value.charAt(index) > 255 ? 2 : 1;
+        return length;
+    }
+
+    private String indicatorLabel(IndicatorDefinition definition) {
+        String unit = definition.getUnit() == null || definition.getUnit().trim().isEmpty()
+                ? "" : "，单位：" + definition.getUnit().trim();
+        return definition.getName() + "（" + indicatorTypeLabel(definition.getDataType()) + unit + "）";
+    }
+
+    private String indicatorTypeLabel(String dataType) {
+        if ("NUMBER".equals(dataType)) return "数值";
+        if ("DATE".equals(dataType)) return "日期";
+        if ("DATETIME".equals(dataType)) return "日期时间";
+        if ("BOOLEAN".equals(dataType)) return "是/否";
+        if ("ENUM".equals(dataType)) return "下拉选择";
+        return "文本";
+    }
+
+    private void writeHeaderCell(Row row, int column, String value, CellStyle style) {
+        Cell cell = row.createCell(column);
+        cell.setCellValue(value);
+        cell.setCellStyle(style);
+    }
+
+    private CellStyle createHeaderStyle(XSSFWorkbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.WHITE.getIndex());
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        return style;
+    }
+
+    private CellStyle createDescriptionStyle(XSSFWorkbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.DARK_BLUE.getIndex());
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setWrapText(true);
+        return style;
     }
 
     private String required(String value, String message) {

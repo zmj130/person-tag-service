@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Plus, Search, Settings2 } from 'lucide-vue-next'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Search, Settings2, Trash2 } from 'lucide-vue-next'
 import { api } from '../api'
 import StateTag from '../components/StateTag.vue'
 
@@ -43,6 +43,12 @@ async function save() {
 }
 
 async function toggleTag(row) { await api.setTagStatus(row.id, row.status !== 1); ElMessage.success(row.status === 1 ? '标签已停用' : '标签已启用'); await load() }
+async function removeTag(row) {
+  await ElMessageBox.confirm(`确认删除标签“${row.name}”？已有历史引用的标签不能删除，只能停用。`, '删除标签', { type: 'warning' })
+  await api.deleteTag(row.id)
+  ElMessage.success('标签已删除')
+  await load()
+}
 
 function openRules(row) { router.push({ path: '/rules', query: { tagId: row.id } }) }
 onMounted(load)
@@ -58,7 +64,7 @@ onMounted(load)
       <el-table-column label="规则审核" width="120"><template #default="{ row }">{{ row.autoApprove === 1 ? '自动通过' : '人工审核' }}</template></el-table-column>
       <el-table-column label="结构化规则" width="120"><template #default="{ row }"><span v-if="rulesByTag[row.id]">{{ rulesByTag[row.id].status === 'PUBLISHED' ? '已发布' : '草稿' }} v{{ rulesByTag[row.id].version }}</span><span v-else>未配置</span></template></el-table-column>
       <el-table-column label="状态" width="90"><template #default="{ row }"><StateTag :value="row.status" /></template></el-table-column>
-      <el-table-column label="操作" width="260" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="openRules(row)"><Settings2 :size="15" />{{ rulesByTag[row.id] ? '查看规则' : '配置规则' }}</el-button><el-button link @click="openEdit(row)">编辑</el-button><el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleTag(row)">{{ row.status === 1 ? '停用' : '启用' }}</el-button></template></el-table-column>
+      <el-table-column label="操作" width="320" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="openRules(row)"><Settings2 :size="15" />{{ rulesByTag[row.id] ? '查看规则' : '配置规则' }}</el-button><el-button link @click="openEdit(row)">编辑</el-button><el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleTag(row)">{{ row.status === 1 ? '停用' : '启用' }}</el-button><el-button link type="danger" title="删除标签" @click="removeTag(row)"><Trash2 :size="15" />删除</el-button></template></el-table-column>
     </el-table></div>
     <div class="pagination-row"><span>共 {{ filtered.length }} 个标签</span></div>
   </section>

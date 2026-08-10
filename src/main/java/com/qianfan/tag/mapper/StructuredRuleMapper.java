@@ -21,6 +21,8 @@ public interface StructuredRuleMapper {
     List<TagRuleCondition> findConditions(@Param("ruleSetId") String ruleSetId);
     int disablePublishedByTag(@Param("tagId") String tagId, @Param("updatedAt") Date updatedAt);
     int publishRuleSet(@Param("id") String id, @Param("publishedAt") Date publishedAt);
+    int deleteConditions(@Param("ruleSetId") String ruleSetId);
+    int deleteDraftRuleSet(@Param("id") String id);
     RuleEvaluationBatch findBatchByNo(@Param("batchNo") String batchNo);
     int insertBatch(RuleEvaluationBatch batch);
     int updateBatchProgress(@Param("batchNo") String batchNo, @Param("scanned") int scanned,

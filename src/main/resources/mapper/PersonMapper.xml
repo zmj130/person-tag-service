@@ -2,7 +2,10 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.qianfan.tag.mapper.PersonMapper">
     <sql id="searchConditions">
-        P.DELETED_FLAG = 0
+        1 = 1
+        <if test="!includeDeleted">
+            AND P.DELETED_FLAG = 0
+        </if>
         <if test="keyword != null and keyword != ''">
             AND (P.NAME LIKE '%' || #{keyword} || '%'
                  OR P.EXTERNAL_ID LIKE '%' || #{keyword} || '%'
@@ -39,6 +42,10 @@
             OCCUPATION = #{occupation}, ADDRESS = #{address}, REMARK = #{remark},
             SOURCE_UPDATED_AT = #{sourceUpdatedAt}, DELETED_FLAG = #{deleted}, UPDATED_AT = #{updatedAt}
         WHERE ID = #{id}
+    </update>
+
+    <update id="updateDeleted">
+        UPDATE PT_PERSON SET DELETED_FLAG = #{deleted}, UPDATED_AT = #{updatedAt} WHERE ID = #{id}
     </update>
 
     <select id="findById" resultType="com.qianfan.tag.domain.PersonRecord">

@@ -9,6 +9,7 @@ import com.qianfan.tag.domain.IndicatorOption;
 import com.qianfan.tag.domain.PersonIndicatorValue;
 import com.qianfan.tag.dto.IndicatorDetail;
 import com.qianfan.tag.dto.IndicatorRequests;
+import com.qianfan.tag.dto.PersonIndicatorItem;
 import com.qianfan.tag.mapper.IndicatorMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,8 +22,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -100,6 +103,25 @@ public class IndicatorService {
         for (IndicatorDefinition definition : mapper.findDefinitions(true)) {
             if ("IMPORT".equals(definition.getSourceType())) result.add(definition);
         }
+        return result;
+    }
+
+    public List<PersonIndicatorItem> listPersonValues(String personId) {
+        Map<String, IndicatorDefinition> definitions = new LinkedHashMap<String, IndicatorDefinition>();
+        for (IndicatorDefinition definition : mapper.findDefinitions(false)) {
+            definitions.put(definition.getId(), definition);
+        }
+        List<PersonIndicatorItem> result = new ArrayList<PersonIndicatorItem>();
+        for (PersonIndicatorValue value : mapper.findPersonValues(personId)) {
+            IndicatorDefinition definition = definitions.get(value.getIndicatorId());
+            if (definition == null) {
+                throw new BusinessException("INDICATOR_DEFINITION_MISSING", "人员指标引用的指标定义不存在");
+            }
+            result.add(new PersonIndicatorItem(definition.getId(), definition.getCode(), definition.getName(),
+                    definition.getDataType(), definition.getUnit(), displayValue(definition, value),
+                    value.getSourceType(), value.getSourceUpdatedAt()));
+        }
+        Collections.sort(result, (left, right) -> left.getCode().compareTo(right.getCode()));
         return result;
     }
 
@@ -294,6 +316,27 @@ public class IndicatorService {
         value.setDateValue(null);
         value.setBooleanValue(null);
         value.setOptionCode(null);
+    }
+
+    private String displayValue(IndicatorDefinition definition, PersonIndicatorValue value) {
+        String type = definition.getDataType();
+        if ("NUMBER".equals(type)) {
+            String number = value.getNumberValue().stripTrailingZeros().toPlainString();
+            return definition.getUnit() == null || definition.getUnit().trim().isEmpty()
+                    ? number : number + " " + definition.getUnit().trim();
+        }
+        if ("DATE".equals(type)) return new SimpleDateFormat("yyyy-MM-dd").format(value.getDateValue());
+        if ("DATETIME".equals(type)) return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(value.getDateValue());
+        if ("BOOLEAN".equals(type)) return Integer.valueOf(1).equals(value.getBooleanValue()) ? "是" : "否";
+        if ("ENUM".equals(type)) {
+            IndicatorOption option = mapper.findOption(definition.getId(), value.getOptionCode());
+            if (option == null) {
+                throw new BusinessException("INDICATOR_OPTION_MISSING", "人员枚举指标引用的选项不存在");
+            }
+            return option.getLabel().equals(option.getCode())
+                    ? option.getLabel() : option.getLabel() + "（" + option.getCode() + "）";
+        }
+        return value.getStringValue();
     }
 
     private String trimToNull(String value) {

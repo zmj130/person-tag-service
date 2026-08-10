@@ -38,6 +38,12 @@
         UPDATE PT_TAG_RULE_SET SET STATUS = 'PUBLISHED', PUBLISHED_AT = #{publishedAt}, UPDATED_AT = #{publishedAt}
         WHERE ID = #{id} AND STATUS = 'DRAFT'
     </update>
+    <delete id="deleteConditions">
+        DELETE FROM PT_TAG_RULE_CONDITION WHERE RULE_SET_ID = #{ruleSetId}
+    </delete>
+    <delete id="deleteDraftRuleSet">
+        DELETE FROM PT_TAG_RULE_SET WHERE ID = #{id} AND STATUS = 'DRAFT'
+    </delete>
     <select id="findBatchByNo" resultType="com.qianfan.tag.domain.RuleEvaluationBatch">
         SELECT ID, BATCH_NO, RULE_SET_ID, STATUS, SCANNED_COUNT, MATCHED_COUNT, EXPIRED_COUNT,
                ERROR_MESSAGE, STARTED_AT, FINISHED_AT
@@ -113,6 +119,7 @@
     <update id="expireOrphanRuleBindings">
         UPDATE PT_PERSON_TAG PT SET PT.STATUS = 'EXPIRED', PT.UPDATED_AT = #{updatedAt}
         WHERE PT.TAG_ID = #{tagId} AND PT.SOURCE_TYPE = 'RULE'
+          AND PT.SOURCE_REF LIKE 'STRUCTURED:%'
           AND NOT EXISTS (
               SELECT 1 FROM PT_PERSON_TAG_EVIDENCE E
               WHERE E.PERSON_ID = PT.PERSON_ID AND E.TAG_ID = PT.TAG_ID

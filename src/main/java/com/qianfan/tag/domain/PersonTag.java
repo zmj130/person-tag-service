@@ -8,6 +8,7 @@ public class PersonTag {
     private String personId;
     private String tagId;
     private String source;
+    private String sourceRef;
     private String status;
     private String ruleId;
     private String batchNo;
@@ -25,6 +26,8 @@ public class PersonTag {
     public void setTagId(String tagId) { this.tagId = tagId; }
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
+    public String getSourceRef() { return sourceRef; }
+    public void setSourceRef(String sourceRef) { this.sourceRef = sourceRef; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getRuleId() { return ruleId; }
@@ -42,4 +45,3 @@ public class PersonTag {
     public Date getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }
-

@@ -16,11 +16,14 @@ public interface TagMapper {
     int updateTag(TagDefinition tag);
     int updateTagStatus(@Param("id") String id, @Param("status") int status,
                         @Param("updatedAt") java.util.Date updatedAt);
+    int countTagReferences(@Param("id") String id);
+    int deleteTag(@Param("id") String id);
     int insertRule(TagRule rule);
     TagRule findRule(@Param("tagId") String tagId, @Param("normalizedKeyword") String normalizedKeyword);
     TagRule findRuleById(@Param("id") String id);
     int updateRuleStatus(@Param("id") String id, @Param("status") int status,
                          @Param("updatedAt") java.util.Date updatedAt);
+    int deleteRule(@Param("id") String id);
     List<TagRule> findRulesByTagId(@Param("tagId") String tagId);
     List<RuleMatch> findEnabledRuleMatches();
 }

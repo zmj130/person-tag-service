@@ -5,7 +5,9 @@ import com.qianfan.tag.domain.PersonRecord;
 import com.qianfan.tag.domain.PersonTag;
 import com.qianfan.tag.dto.PageResult;
 import com.qianfan.tag.dto.PersonRequests;
+import com.qianfan.tag.dto.PersonIndicatorItem;
 import com.qianfan.tag.dto.ReviewItem;
+import com.qianfan.tag.service.IndicatorService;
 import com.qianfan.tag.service.PersonService;
 import com.qianfan.tag.service.PersonTagService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,10 +29,13 @@ import java.util.List;
 public class PersonController {
     private final PersonService personService;
     private final PersonTagService personTagService;
+    private final IndicatorService indicatorService;
 
-    public PersonController(PersonService personService, PersonTagService personTagService) {
+    public PersonController(PersonService personService, PersonTagService personTagService,
+                            IndicatorService indicatorService) {
         this.personService = personService;
         this.personTagService = personTagService;
+        this.indicatorService = indicatorService;
     }
 
     @PostMapping
@@ -43,10 +48,28 @@ public class PersonController {
         return ApiResponse.success(personService.search(request));
     }
 
+    @DeleteMapping("/{personId}")
+    public ApiResponse<Void> delete(@PathVariable String personId) {
+        personService.changeDeleted(personId, true);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/{personId}/restore")
+    public ApiResponse<Void> restore(@PathVariable String personId) {
+        personService.changeDeleted(personId, false);
+        return ApiResponse.success(null);
+    }
+
     @GetMapping("/{personId}/tags")
     public ApiResponse<List<PersonTag>> listTags(@PathVariable String personId) {
         personService.requirePerson(personId);
         return ApiResponse.success(personTagService.listByPerson(personId));
+    }
+
+    @GetMapping("/{personId}/indicators")
+    public ApiResponse<List<PersonIndicatorItem>> listIndicators(@PathVariable String personId) {
+        personService.requirePerson(personId);
+        return ApiResponse.success(indicatorService.listPersonValues(personId));
     }
 
     @PostMapping("/{personId}/tags")

@@ -29,7 +29,7 @@ WHERE PARA_NAME IN ('COMPATIBLE_MODE', 'CASE_SENSITIVE');
 
 - 使用独立用户/模式，确认表名 `PT_*` 没有冲突。
 - 数据库和客户端脚本编码使用 UTF-8。
-- 新库依次执行 `V1__init.sql`、`V2__indicator_rule_profile.sql`；演示数据和清理脚本统一放在 `db/dm/demo`，生产环境不要执行。
+- 新库依次执行 `V1__init.sql`、`V2__indicator_rule_profile.sql`、`V3__multi_source_tag_binding.sql`；已有 V2 数据库只补执行 V3。演示数据和清理脚本统一放在 `db/dm/demo`，生产环境不要执行。
 - 将数据库密码、远程令牌和调度令牌放入部署环境变量，不写入仓库。
 - 执行初始化后检查唯一约束和索引是否创建成功。
 

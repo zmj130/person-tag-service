@@ -7,6 +7,7 @@ import com.qianfan.tag.dto.TagRequests;
 import com.qianfan.tag.service.TagService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -51,6 +52,12 @@ public class TagController {
         return ApiResponse.success(null);
     }
 
+    @DeleteMapping("/{tagId}")
+    public ApiResponse<Void> delete(@PathVariable String tagId) {
+        tagService.delete(tagId);
+        return ApiResponse.success(null);
+    }
+
     @PostMapping("/{tagId}/rules")
     public ApiResponse<TagRule> addRule(@PathVariable String tagId,
                                         @Valid @RequestBody TagRequests.CreateRule request) {
@@ -66,6 +73,12 @@ public class TagController {
     public ApiResponse<Void> changeRuleStatus(@PathVariable String ruleId,
                                               @Valid @RequestBody TagRequests.ChangeStatus request) {
         tagService.changeRuleStatus(ruleId, request.getEnabled());
+        return ApiResponse.success(null);
+    }
+
+    @DeleteMapping("/rules/{ruleId}")
+    public ApiResponse<Void> deleteRule(@PathVariable String ruleId) {
+        tagService.deleteRule(ruleId);
         return ApiResponse.success(null);
     }
 }

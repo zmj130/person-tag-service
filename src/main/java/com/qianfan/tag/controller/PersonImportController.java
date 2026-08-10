@@ -27,11 +27,20 @@ public class PersonImportController {
 
     @GetMapping("/template")
     public ResponseEntity<byte[]> template() {
+        return download("person-import-template.xlsx", service.createTemplate());
+    }
+
+    @GetMapping("/example")
+    public ResponseEntity<byte[]> example() {
+        return download("person-import-example.xlsx", service.createExample());
+    }
+
+    private ResponseEntity<byte[]> download(String fileName, byte[] content) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.setContentDisposition(ContentDisposition.attachment()
-                .filename("person-import-template.xlsx", StandardCharsets.UTF_8).build());
-        return ResponseEntity.ok().headers(headers).body(service.createTemplate());
+                .filename(fileName, StandardCharsets.UTF_8).build());
+        return ResponseEntity.ok().headers(headers).body(content);
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -122,6 +122,18 @@ public class StructuredRuleService {
         return require(id);
     }
 
+    @Transactional
+    public void deleteDraft(String id) {
+        TagRuleSet ruleSet = require(id);
+        if (!"DRAFT".equals(ruleSet.getStatus())) {
+            throw new BusinessException("RULE_SET_DELETE_FORBIDDEN", "只有草稿规则可以删除，已发布版本需保留历史");
+        }
+        mapper.deleteConditions(id);
+        if (mapper.deleteDraftRuleSet(id) == 0) {
+            throw new BusinessException("RULE_SET_DELETE_FAILED", "规则草稿删除失败");
+        }
+    }
+
     public synchronized RuleEvaluationBatch recalculate(String ruleSetId, String batchNo) {
         if (batchNo == null || batchNo.trim().isEmpty() || batchNo.trim().length() > 64) {
             throw new BusinessException("RULE_BATCH_NO_INVALID", "规则重算批次号不能为空且不能超过64个字符");

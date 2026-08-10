@@ -8,6 +8,7 @@ import com.qianfan.tag.dto.PersonRequests;
 import com.qianfan.tag.mapper.PersonMapper;
 import com.qianfan.tag.remote.RemotePerson;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
@@ -20,12 +21,15 @@ public class PersonService {
     private final PersonMapper personMapper;
     private final PersonTagService personTagService;
     private final StructuredRuleService structuredRuleService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PersonService(PersonMapper personMapper, PersonTagService personTagService,
-                         StructuredRuleService structuredRuleService) {
+                         StructuredRuleService structuredRuleService,
+                         ApplicationEventPublisher eventPublisher) {
         this.personMapper = personMapper;
         this.personTagService = personTagService;
         this.structuredRuleService = structuredRuleService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -43,6 +47,7 @@ public class PersonService {
         PersonRecord person = upsertRemote(remote);
         personTagService.applyRules(person, "MANUAL_UPSERT");
         structuredRuleService.evaluatePublishedForPerson(person, "MANUAL_UPSERT");
+        publishProfileRefresh(person.getId());
         return person;
     }
 
@@ -76,6 +81,7 @@ public class PersonService {
         } else {
             personMapper.update(person);
         }
+        publishProfileRefresh(person.getId());
         return person;
     }
 
@@ -87,6 +93,15 @@ public class PersonService {
         return person;
     }
 
+    @Transactional
+    public void changeDeleted(String id, boolean deleted) {
+        requirePerson(id);
+        if (personMapper.updateDeleted(id, deleted ? 1 : 0, new Date()) == 0) {
+            throw new BusinessException("PERSON_STATUS_UPDATE_FAILED", "人员删除状态更新失败");
+        }
+        publishProfileRefresh(id);
+    }
+
     public PageResult<PersonRecord> search(PersonRequests.Search request) {
         int pageNo = request.getPageNo() == null ? 1 : request.getPageNo();
         int pageSize = request.getPageSize() == null ? 20 : request.getPageSize();
@@ -96,10 +111,16 @@ public class PersonService {
         List<String> tagIds = request.getTagIds() == null
                 ? Collections.<String>emptyList() : request.getTagIds();
         boolean andMode = !"OR".equalsIgnoreCase(request.getTagOperator());
+        boolean includeDeleted = Boolean.TRUE.equals(request.getIncludeDeleted());
         int offset = (pageNo - 1) * pageSize;
-        long total = personMapper.countSearch(request.getKeyword(), tagIds, andMode, tagIds.size());
+        long total = personMapper.countSearch(request.getKeyword(), tagIds, andMode, tagIds.size(), includeDeleted);
         List<PersonRecord> records = total == 0 ? Collections.<PersonRecord>emptyList()
-                : personMapper.search(request.getKeyword(), tagIds, andMode, tagIds.size(), offset, offset + pageSize);
+                : personMapper.search(request.getKeyword(), tagIds, andMode, tagIds.size(),
+                        offset, offset + pageSize, includeDeleted);
         return new PageResult<PersonRecord>(total, pageNo, pageSize, records);
+    }
+
+    private void publishProfileRefresh(String personId) {
+        eventPublisher.publishEvent(new ProfileRefreshEvent(personId));
     }
 }

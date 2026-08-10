@@ -37,6 +37,7 @@ async function save() {
 }
 async function publish(row) { await ElMessageBox.confirm('发布后会停用该标签的上一版本规则，是否继续？', '发布规则'); await api.publishRuleSet(row.id); ElMessage.success('规则已发布'); await load() }
 async function recalculate(row) { await api.recalculateRuleSet(row.id, `RULE_${Date.now()}`); ElMessage.success('全量重算完成，命中结果已进入审核') }
+async function removeDraft(row) { await ElMessageBox.confirm('确认删除该规则草稿？此操作不可恢复。', '删除草稿', { type: 'warning' }); await api.deleteRuleSet(row.id); ElMessage.success('规则草稿已删除'); await load() }
 function conditionText(condition) {
   const detail = indicatorMap.value[condition.indicatorId]
   let expected = condition.expectedValues
@@ -54,7 +55,7 @@ onMounted(load)
       <el-table-column label="条件关系" width="110"><template #default="{ row }">{{ row.matchMode === 'ALL' ? '满足全部' : '满足任一' }}</template></el-table-column>
       <el-table-column label="规则条件" min-width="320"><template #default="{ row }"><div class="condition-list"><span v-for="condition in row.conditions" :key="condition.id">{{ conditionText(condition) }}</span></div></template></el-table-column>
       <el-table-column label="状态" width="100"><template #default="{ row }"><StateTag :value="row.status" /></template></el-table-column>
-      <el-table-column label="操作" width="190" fixed="right"><template #default="{ row }"><el-button v-if="row.status === 'DRAFT'" link type="primary" @click="publish(row)"><Rocket :size="15" />发布</el-button><el-button v-if="row.status === 'PUBLISHED'" link type="primary" @click="recalculate(row)"><Play :size="15" />重算</el-button></template></el-table-column>
+      <el-table-column label="操作" width="220" fixed="right"><template #default="{ row }"><el-button v-if="row.status === 'DRAFT'" link type="primary" @click="publish(row)"><Rocket :size="15" />发布</el-button><el-button v-if="row.status === 'DRAFT'" link type="danger" @click="removeDraft(row)"><Trash2 :size="15" />删除</el-button><el-button v-if="row.status === 'PUBLISHED'" link type="primary" @click="recalculate(row)"><Play :size="15" />重算</el-button></template></el-table-column>
     </el-table></div>
   </section>
 

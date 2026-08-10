@@ -5,9 +5,9 @@ spring:
     name: person-tag-service
   datasource:
     driver-class-name: dm.jdbc.driver.DmDriver
-    url: ${DM_URL:jdbc:dm://127.0.0.1:5236?schema=PERSON_TAG}
+    url: ${DM_URL:jdbc:dm://10.3.6.130:5237?schema=PERSON_TAG}
     username: ${DM_USERNAME:PERSON_TAG}
-    password: ${DM_PASSWORD:change-me}
+    password: ${DM_PASSWORD:Dtc@2026}
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
       minimum-idle: ${DB_POOL_MIN_IDLE:2}
@@ -34,10 +34,10 @@ remote-person:
   read-timeout-ms: ${REMOTE_READ_TIMEOUT_MS:10000}
 scheduler:
   # DolphinScheduler 调用内部任务接口时必须携带 X-Scheduler-Token。
-  token: ${SCHEDULER_TOKEN:local-demo-token}
+  token: ${SCHEDULER_TOKEN:a4520a6f-dd1c-4a60-84f2-c6c68fbdf4e6}
 profile-search:
   enabled: ${ES_ENABLED:true}
-  url: ${ES_URL:http://127.0.0.1:9200}
+  url: ${ES_URL:http://10.3.7.225:9200}
   index: ${ES_INDEX:person_tag_resume_demo_v1}
   username: ${ES_USERNAME:}
   password: ${ES_PASSWORD:}

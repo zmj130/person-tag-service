@@ -3,11 +3,15 @@ package com.qianfan.tag;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qianfan.tag.domain.PersonRecord;
 import com.qianfan.tag.domain.PersonTag;
+import com.qianfan.tag.domain.IndicatorDefinition;
+import com.qianfan.tag.dto.IndicatorRequests;
 import com.qianfan.tag.dto.PersonRequests;
 import com.qianfan.tag.mapper.PersonMapper;
 import com.qianfan.tag.mapper.PersonTagMapper;
 import com.qianfan.tag.mapper.TagMapper;
 import com.qianfan.tag.service.PersonService;
+import com.qianfan.tag.service.PersonTagService;
+import com.qianfan.tag.service.IndicatorService;
 import com.qianfan.tag.trie.TrieManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +24,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,8 +42,39 @@ class PersonSyncIntegrationTest {
     @Autowired private PersonMapper personMapper;
     @Autowired private PersonTagMapper personTagMapper;
     @Autowired private PersonService personService;
+    @Autowired private PersonTagService personTagService;
     @Autowired private TrieManager trieManager;
     @Autowired private TagMapper tagMapper;
+    @Autowired private IndicatorService indicatorService;
+
+    @Test
+    void shouldExplainUnsupportedMethodInsteadOfReturningSystemError() throws Exception {
+        mockMvc.perform(patch("/api/tags/10000000000000000000000000000001"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.message").value("当前后端不支持该操作，请确认服务已升级并重启"));
+    }
+
+    @Test
+    void shouldExposeFormattedDynamicIndicatorsInPersonDetail() throws Exception {
+        PersonRequests.UpsertPerson personRequest = new PersonRequests.UpsertPerson();
+        personRequest.setExternalId("DETAIL-INDICATOR-001");
+        personRequest.setName("指标详情测试人员");
+        PersonRecord person = personService.upsert(personRequest);
+
+        IndicatorDefinition active = createIndicator("TEST_DETAIL_ACTIVE", "是否活跃", "BOOLEAN", null);
+        IndicatorDefinition amount = createIndicator("TEST_DETAIL_AMOUNT", "年度流水", "NUMBER", "元");
+        indicatorService.saveImportedValue(person.getId(), active, "true", "DETAIL_TEST", new Date());
+        indicatorService.saveImportedValue(person.getId(), amount, "1200.500", "DETAIL_TEST", new Date());
+
+        mockMvc.perform(get("/api/persons/{personId}/indicators", person.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].code").value("TEST_DETAIL_ACTIVE"))
+                .andExpect(jsonPath("$.data[0].name").value("是否活跃"))
+                .andExpect(jsonPath("$.data[0].value").value("是"))
+                .andExpect(jsonPath("$.data[1].code").value("TEST_DETAIL_AMOUNT"))
+                .andExpect(jsonPath("$.data[1].value").value("1200.5 元"));
+    }
 
     @Test
     void shouldSyncRemoteTagsAndCreateRuleCandidatesIdempotently() throws Exception {
@@ -120,5 +157,59 @@ class PersonSyncIntegrationTest {
                 .andExpect(jsonPath("$.data.gender").value("女"));
 
         assertThat(personMapper.findByExternalId("MANUAL-GENDER-001").getGender()).isEqualTo("女");
+    }
+
+    @Test
+    void shouldKeepManualBindingWhenRemoteSourceIsRemoved() {
+        PersonRequests.UpsertPerson request = new PersonRequests.UpsertPerson();
+        request.setExternalId("MULTI-SOURCE-001");
+        request.setName("多来源测试人员");
+        PersonRecord person = personService.upsert(request);
+
+        String tagId = "10000000000000000000000000000001";
+        personTagService.bindManual(person.getId(), tagId, "TEST_OPERATOR");
+        personTagService.bindRemoteTags(person, Collections.singletonList("TRANSPORT_WORKER"), "REMOTE-001");
+
+        assertThat(personTagMapper.findByPersonId(person.getId()))
+                .filteredOn(item -> tagId.equals(item.getTagId()))
+                .extracting(PersonTag::getSource)
+                .containsExactlyInAnyOrder("MANUAL", "REMOTE");
+
+        personTagService.removeRemoteTags(person, Collections.singletonList("TRANSPORT_WORKER"));
+
+        assertThat(personTagMapper.findByPersonId(person.getId()))
+                .filteredOn(item -> tagId.equals(item.getTagId()))
+                .singleElement()
+                .extracting(PersonTag::getSource)
+                .isEqualTo("MANUAL");
+    }
+
+    @Test
+    void shouldSoftDeleteAndRestorePerson() {
+        PersonRequests.UpsertPerson request = new PersonRequests.UpsertPerson();
+        request.setExternalId("DELETE-RESTORE-001");
+        request.setName("删除恢复测试人员");
+        PersonRecord person = personService.upsert(request);
+
+        personService.changeDeleted(person.getId(), true);
+        PersonRequests.Search search = new PersonRequests.Search();
+        search.setKeyword("DELETE-RESTORE-001");
+        assertThat(personService.search(search).getTotal()).isZero();
+
+        search.setIncludeDeleted(true);
+        assertThat(personService.search(search).getTotal()).isEqualTo(1);
+        personService.changeDeleted(person.getId(), false);
+        search.setIncludeDeleted(false);
+        assertThat(personService.search(search).getTotal()).isEqualTo(1);
+    }
+
+    private IndicatorDefinition createIndicator(String code, String name, String dataType, String unit) {
+        IndicatorRequests.Create request = new IndicatorRequests.Create();
+        request.setCode(code);
+        request.setName(name);
+        request.setDataType(dataType);
+        request.setSourceType("IMPORT");
+        request.setUnit(unit);
+        return indicatorService.create(request);
     }
 }

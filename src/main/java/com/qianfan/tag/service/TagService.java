@@ -6,6 +6,7 @@ import com.qianfan.tag.domain.TagDefinition;
 import com.qianfan.tag.domain.TagRule;
 import com.qianfan.tag.dto.TagRequests;
 import com.qianfan.tag.mapper.TagMapper;
+import com.qianfan.tag.mapper.PersonTagMapper;
 import com.qianfan.tag.trie.RuleChangedEvent;
 import com.qianfan.tag.trie.TextNormalizer;
 import org.springframework.context.ApplicationEventPublisher;
@@ -21,12 +22,14 @@ public class TagService {
     private final TagMapper tagMapper;
     private final TextNormalizer normalizer;
     private final ApplicationEventPublisher eventPublisher;
+    private final PersonTagMapper personTagMapper;
 
     public TagService(TagMapper tagMapper, TextNormalizer normalizer,
-                      ApplicationEventPublisher eventPublisher) {
+                      ApplicationEventPublisher eventPublisher, PersonTagMapper personTagMapper) {
         this.tagMapper = tagMapper;
         this.normalizer = normalizer;
         this.eventPublisher = eventPublisher;
+        this.personTagMapper = personTagMapper;
     }
 
     @Transactional
@@ -55,6 +58,7 @@ public class TagService {
 
     @Transactional
     public TagDefinition update(String tagId, TagRequests.UpdateTag request) {
+        List<String> affectedPersonIds = personTagMapper.findPersonIdsByTag(tagId);
         TagDefinition tag = requireTag(tagId);
         tag.setName(request.getName().trim());
         tag.setCategory(request.getCategory().trim());
@@ -63,14 +67,28 @@ public class TagService {
         tag.setUpdatedAt(new Date());
         tagMapper.updateTag(tag);
         eventPublisher.publishEvent(new RuleChangedEvent());
+        publishProfileRefresh(affectedPersonIds);
         return tag;
     }
 
     @Transactional
     public void changeStatus(String tagId, boolean enabled) {
+        List<String> affectedPersonIds = personTagMapper.findPersonIdsByTag(tagId);
         requireTag(tagId);
         tagMapper.updateTagStatus(tagId, enabled ? 1 : 0, new Date());
         eventPublisher.publishEvent(new RuleChangedEvent());
+        publishProfileRefresh(affectedPersonIds);
+    }
+
+    @Transactional
+    public void delete(String tagId) {
+        requireTag(tagId);
+        if (tagMapper.countTagReferences(tagId) > 0) {
+            throw new BusinessException("TAG_IN_USE", "标签已有规则、人员关系或历史记录，请改为停用");
+        }
+        if (tagMapper.deleteTag(tagId) == 0) {
+            throw new BusinessException("TAG_DELETE_FAILED", "标签删除失败");
+        }
     }
 
     @Transactional
@@ -113,11 +131,29 @@ public class TagService {
         eventPublisher.publishEvent(new RuleChangedEvent());
     }
 
+    @Transactional
+    public void deleteRule(String ruleId) {
+        if (tagMapper.findRuleById(ruleId) == null) {
+            throw new BusinessException("RULE_NOT_FOUND", "标签规则不存在");
+        }
+        List<String> affectedPersonIds = personTagMapper.findPersonIdsByRule(ruleId);
+        personTagMapper.deleteKeywordRuleBindings(ruleId);
+        tagMapper.deleteRule(ruleId);
+        eventPublisher.publishEvent(new RuleChangedEvent());
+        publishProfileRefresh(affectedPersonIds);
+    }
+
     public TagDefinition requireTag(String tagId) {
         TagDefinition tag = tagMapper.findTagById(tagId);
         if (tag == null) {
             throw new BusinessException("TAG_NOT_FOUND", "标签不存在");
         }
         return tag;
+    }
+
+    private void publishProfileRefresh(List<String> personIds) {
+        for (String personId : personIds) {
+            eventPublisher.publishEvent(new ProfileRefreshEvent(personId));
+        }
     }
 }

@@ -6,6 +6,7 @@ import com.qianfan.tag.domain.TagRuleSet;
 import com.qianfan.tag.dto.RuleSetRequests;
 import com.qianfan.tag.service.StructuredRuleService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +34,12 @@ public class RuleSetController {
     @PostMapping("/{ruleSetId}/publish")
     public ApiResponse<TagRuleSet> publish(@PathVariable String ruleSetId) {
         return ApiResponse.success(service.publish(ruleSetId));
+    }
+
+    @DeleteMapping("/{ruleSetId}")
+    public ApiResponse<Void> deleteDraft(@PathVariable String ruleSetId) {
+        service.deleteDraft(ruleSetId);
+        return ApiResponse.success(null);
     }
 
     @PostMapping("/{ruleSetId}/recalculate")

@@ -71,6 +71,7 @@ public final class PersonRequests {
         private String keyword;
         private List<String> tagIds = new ArrayList<String>();
         private String tagOperator = "AND";
+        private Boolean includeDeleted = false;
         @NotNull private Integer pageNo = 1;
         @NotNull private Integer pageSize = 20;
         public String getKeyword() { return keyword; }
@@ -79,6 +80,8 @@ public final class PersonRequests {
         public void setTagIds(List<String> tagIds) { this.tagIds = tagIds; }
         public String getTagOperator() { return tagOperator; }
         public void setTagOperator(String tagOperator) { this.tagOperator = tagOperator; }
+        public Boolean getIncludeDeleted() { return includeDeleted; }
+        public void setIncludeDeleted(Boolean includeDeleted) { this.includeDeleted = includeDeleted; }
         public Integer getPageNo() { return pageNo; }
         public void setPageNo(Integer pageNo) { this.pageNo = pageNo; }
         public Integer getPageSize() { return pageSize; }

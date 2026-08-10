@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 /** 将参数错误、业务错误和未知异常转换为稳定的接口协议。 */
 @RestControllerAdvice
@@ -26,6 +27,12 @@ public class GlobalExceptionHandler {
         return ApiResponse.failure("INVALID_ARGUMENT", "请求参数校验失败");
     }
 
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public ApiResponse<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return ApiResponse.failure("METHOD_NOT_ALLOWED", "当前后端不支持该操作，请确认服务已升级并重启");
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleUnknownException(Exception ex) {
@@ -33,4 +40,3 @@ public class GlobalExceptionHandler {
         return ApiResponse.failure("SYSTEM_ERROR", "系统内部错误");
     }
 }
-

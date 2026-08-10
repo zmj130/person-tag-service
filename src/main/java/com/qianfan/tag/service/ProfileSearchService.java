@@ -19,6 +19,7 @@ import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -36,6 +37,7 @@ import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.terms.ParsedStringTerms;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.action.support.WriteRequest;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +50,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -114,6 +117,26 @@ public class ProfileSearchService {
             bulkIndex(client, persons, indicators, tags);
             client.indices().refresh(new RefreshRequest(properties.getIndex()), RequestOptions.DEFAULT);
             return new ProfileIndexStatus(true, true, properties.getIndex(), persons.size());
+        } catch (IOException ex) {
+            throw unavailable(ex);
+        }
+    }
+
+    public void refreshPerson(String personId) {
+        if (!properties.isEnabled()) return;
+        validateIndexName();
+        try {
+            RestHighLevelClient client = requireClient();
+            if (!client.indices().exists(new GetIndexRequest(properties.getIndex()), RequestOptions.DEFAULT)) return;
+            PersonRecord person = personMapper.findById(personId);
+            if (person == null || Integer.valueOf(1).equals(person.getDeleted())) {
+                client.delete(new DeleteRequest(properties.getIndex(), personId)
+                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), RequestOptions.DEFAULT);
+                return;
+            }
+            client.index(new IndexRequest(properties.getIndex()).id(personId)
+                    .source(document(person, indicatorMap(), tagMap()))
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE), RequestOptions.DEFAULT);
         } catch (IOException ex) {
             throw unavailable(ex);
         }
@@ -342,8 +365,8 @@ public class ProfileSearchService {
         put(doc, "remark", person.getRemark());
         put(doc, "updatedAt", date(person.getUpdatedAt()));
 
-        List<String> tagIds = new ArrayList<String>();
-        List<String> tagNames = new ArrayList<String>();
+        java.util.Set<String> tagIds = new LinkedHashSet<String>();
+        java.util.Set<String> tagNames = new LinkedHashSet<String>();
         for (PersonTag binding : personTagMapper.findByPersonId(person.getId())) {
             if (!"APPROVED".equals(binding.getStatus())) continue;
             TagDefinition tag = tagDefinitions.get(binding.getTagId());
@@ -352,8 +375,8 @@ public class ProfileSearchService {
                 tagNames.add(tag.getName());
             }
         }
-        doc.put("tagIds", tagIds);
-        doc.put("tagNames", tagNames);
+        doc.put("tagIds", new ArrayList<String>(tagIds));
+        doc.put("tagNames", new ArrayList<String>(tagNames));
 
         List<Map<String, Object>> values = new ArrayList<Map<String, Object>>();
         for (PersonIndicatorValue value : indicatorMapper.findPersonValues(person.getId())) {

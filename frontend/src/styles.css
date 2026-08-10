@@ -57,6 +57,16 @@ button, input, textarea, select { font: inherit; }
 .detail-grid div { min-width: 0; }
 .detail-grid dt { margin-bottom: 5px; color: var(--muted); font-size: 12px; }
 .detail-grid dd { margin: 0; line-height: 1.55; word-break: break-word; }
+.indicator-section { min-height: 44px; margin-bottom: 28px; }
+.indicator-kv-grid { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border-top: 1px solid var(--line); }
+.indicator-kv-grid > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, auto); gap: 12px; align-items: center; min-width: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.indicator-kv-grid > div:nth-child(odd) { padding-right: 18px; }
+.indicator-kv-grid > div:nth-child(even) { padding-left: 18px; border-left: 1px solid var(--line); }
+.indicator-kv-grid dt, .indicator-kv-grid dd { min-width: 0; margin: 0; }
+.indicator-kv-grid dt span { display: block; font-size: 13px; }
+.indicator-kv-grid dt small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.indicator-kv-grid dd { text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+.section-empty { margin: 0; padding: 14px 0; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .detail-span { grid-column: 1 / -1; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-heading h3 { margin: 0; font-size: 15px; letter-spacing: 0; }
@@ -66,11 +76,19 @@ button, input, textarea, select { font: inherit; }
 .binding-row, .rule-row { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 2px; border-bottom: 1px solid #edf1f0; }
 .binding-row b, .rule-row b { font-size: 14px; }
 .binding-row p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.tag-detail-trigger { padding: 0; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.tag-detail-trigger b { display: block; }
+.tag-detail-trigger small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.source-detail-list { display: grid; gap: 2px; }
+.source-detail-row { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #edf1f0; }
+.source-detail-row:last-child { border-bottom: 0; }
+.source-detail-row p { display: flex; gap: 6px; margin: 0 0 5px; }
+.source-detail-row small { color: var(--muted); }
 .rule-row small { display: block; margin-top: 4px; color: var(--muted); }
 .state-tag { display: inline-flex; min-height: 22px; align-items: center; padding: 2px 7px; color: #52615d; font-size: 12px; line-height: 16px; background: #edf1f0; border-radius: 4px; white-space: nowrap; }
-.state-approved, .state-success, .state-1, .state-manual { color: #176044; background: #dcf2e8; }
-.state-pending, .state-running, .state-rule { color: #8a5a08; background: #fff0cf; }
-.state-rejected, .state-failed, .state-0 { color: #a53c3c; background: #fde4e4; }
+.state-approved, .state-success, .state-published, .state-active, .state-normal, .state-1, .state-manual { color: #176044; background: #dcf2e8; }
+.state-pending, .state-running, .state-draft, .state-rule { color: #8a5a08; background: #fff0cf; }
+.state-rejected, .state-failed, .state-disabled, .state-expired, .state-deleted, .state-0 { color: #a53c3c; background: #fde4e4; }
 .state-remote { color: #285d8e; background: #e1edf8; }
 .keyword-chip { display: inline-block; padding: 3px 8px; color: #315f54; background: #e7f1ee; border: 1px solid #d3e6e0; border-radius: 4px; }
 .mono { font-family: Consolas, monospace; font-size: 13px; }
@@ -126,6 +144,8 @@ button, input, textarea, select { font: inherit; }
   .form-grid { grid-template-columns: 1fr; }
   .form-span { grid-column: auto; }
   .detail-grid { grid-template-columns: 1fr; }
+  .indicator-kv-grid { grid-template-columns: 1fr; }
+  .indicator-kv-grid > div:nth-child(odd), .indicator-kv-grid > div:nth-child(even) { padding-right: 0; padding-left: 0; border-left: 0; }
   .detail-span { grid-column: auto; }
   .condition-editor { grid-template-columns: 1fr; }
   .condition-editor .el-button { justify-self: end; }

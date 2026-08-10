@@ -22,7 +22,7 @@ onMounted(load)
 
 <template>
   <section class="workspace">
-    <div class="import-band"><div><b>动态人员模板</b><span>模板会包含当前启用的导入型指标；任意一行校验失败，整批数据都不会写入。</span></div><el-button tag="a" href="/api/imports/persons/template"><Download :size="16" />下载模板</el-button></div>
+    <div class="import-band"><div><b>动态人员模板</b><span>第一行是字段编码，第二行是中文说明，第三行开始填写数据；任意一行校验失败，整批数据都不会写入。</span></div><el-button-group><el-button tag="a" href="/api/imports/persons/template"><Download :size="16" />空模板</el-button><el-button tag="a" href="/api/imports/persons/example"><Download :size="16" />示例数据</el-button></el-button-group></div>
     <div class="action-row import-actions"><div class="filter-row"><el-input v-model="batchNo" class="batch-input" placeholder="导入批次号" /><el-upload :auto-upload="false" :limit="1" accept=".xlsx" :on-change="choose"><el-button><Upload :size="16" />选择 Excel</el-button></el-upload><span class="selected-file">{{ file?.name || '未选择文件' }}</span></div><el-button type="primary" :loading="uploading" @click="upload">开始导入</el-button></div>
     <div class="table-wrap"><el-table v-loading="loading" :data="rows" height="100%" empty-text="暂无导入记录">
       <el-table-column prop="batchNo" label="批次号" min-width="190" /><el-table-column prop="fileName" label="文件" min-width="180" show-overflow-tooltip /><el-table-column label="状态" width="100"><template #default="{ row }"><StateTag :value="row.status" /></template></el-table-column><el-table-column prop="totalCount" label="总行数" width="90" /><el-table-column prop="successCount" label="成功" width="90" /><el-table-column prop="errorMessage" label="错误" min-width="220" show-overflow-tooltip /><el-table-column prop="startedAt" label="开始时间" width="170" />

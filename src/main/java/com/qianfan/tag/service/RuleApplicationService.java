@@ -8,6 +8,7 @@ import com.qianfan.tag.domain.TagRuleSet;
 import com.qianfan.tag.mapper.PersonTagMapper;
 import com.qianfan.tag.mapper.StructuredRuleMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Date;
 
@@ -16,25 +17,28 @@ public class RuleApplicationService {
     private final RuleConditionEvaluator evaluator;
     private final StructuredRuleMapper ruleMapper;
     private final PersonTagMapper personTagMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public RuleApplicationService(RuleConditionEvaluator evaluator, StructuredRuleMapper ruleMapper,
-                                  PersonTagMapper personTagMapper) {
+                                  PersonTagMapper personTagMapper, ApplicationEventPublisher eventPublisher) {
         this.evaluator = evaluator;
         this.ruleMapper = ruleMapper;
         this.personTagMapper = personTagMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     public boolean apply(PersonRecord person, TagRuleSet ruleSet, String batchNo) {
+        String sourceRef = sourceRef(ruleSet);
         RuleEvaluationResult result = evaluator.evaluate(person, ruleSet);
         if (result.isMatched()) {
             activateEvidenceAndBinding(person, ruleSet, batchNo, result.getDetail());
+            eventPublisher.publishEvent(new ProfileRefreshEvent(person.getId()));
             return true;
         }
         Date now = new Date();
         ruleMapper.expireActiveEvidence(person.getId(), ruleSet.getTagId(), ruleSet.getId(), now);
-        if (ruleMapper.countActiveRuleEvidence(person.getId(), ruleSet.getTagId()) == 0) {
-            personTagMapper.expireRuleBinding(person.getId(), ruleSet.getTagId(), now);
-        }
+        personTagMapper.expireRuleBinding(person.getId(), ruleSet.getTagId(), sourceRef, now);
+        eventPublisher.publishEvent(new ProfileRefreshEvent(person.getId()));
         return false;
     }
 
@@ -59,8 +63,11 @@ public class RuleApplicationService {
         evidence.setEvidenceStatus("ACTIVE");
         evidence.setUpdatedAt(now);
 
-        PersonTag binding = personTagMapper.find(person.getId(), ruleSet.getTagId());
-        if (binding != null && !"RULE".equals(binding.getSource()) && "APPROVED".equals(binding.getStatus())) {
+        PersonTag binding = personTagMapper.findBySource(
+                person.getId(), ruleSet.getTagId(), sourceRef(ruleSet));
+        PersonTag trustedBinding = personTagMapper.find(person.getId(), ruleSet.getTagId());
+        if (trustedBinding != null && !"RULE".equals(trustedBinding.getSource())
+                && "APPROVED".equals(trustedBinding.getStatus())) {
             evidence.setReviewStatus("APPROVED");
             evidence.setReviewedBy("TRUSTED_SOURCE");
             evidence.setReviewedAt(now);
@@ -79,6 +86,7 @@ public class RuleApplicationService {
             binding.setPersonId(person.getId());
             binding.setTagId(ruleSet.getTagId());
             binding.setSource("RULE");
+            binding.setSourceRef(sourceRef(ruleSet));
             binding.setStatus(evidence.getReviewStatus());
             binding.setRuleId(ruleSet.getId());
             binding.setBatchNo(batchNo);
@@ -95,5 +103,9 @@ public class RuleApplicationService {
             binding.setUpdatedAt(now);
             personTagMapper.updateBinding(binding);
         }
+    }
+
+    private String sourceRef(TagRuleSet ruleSet) {
+        return "STRUCTURED:" + ruleSet.getId();
     }
 }

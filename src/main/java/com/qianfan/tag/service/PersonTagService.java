@@ -13,6 +13,7 @@ import com.qianfan.tag.mapper.TagMapper;
 import com.qianfan.tag.trie.RuleMatch;
 import com.qianfan.tag.trie.TrieManager;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
@@ -31,19 +32,24 @@ public class PersonTagService {
     private final TagMapper tagMapper;
     private final TrieManager trieManager;
     private final StructuredRuleMapper structuredRuleMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PersonTagService(PersonTagMapper personTagMapper, TagMapper tagMapper, TrieManager trieManager,
-                            StructuredRuleMapper structuredRuleMapper) {
+                            StructuredRuleMapper structuredRuleMapper, ApplicationEventPublisher eventPublisher) {
         this.personTagMapper = personTagMapper;
         this.tagMapper = tagMapper;
         this.trieManager = trieManager;
         this.structuredRuleMapper = structuredRuleMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
     public PersonTag bindManual(String personId, String tagId, String operator) {
         TagDefinition tag = requireEnabledTagById(tagId);
-        return saveBinding(personId, tag.getId(), "MANUAL", APPROVED, null, null, null, operator);
+        PersonTag binding = saveBinding(personId, tag.getId(), "MANUAL", "MANUAL", APPROVED,
+                null, null, null, operator);
+        publishProfileRefresh(personId);
+        return binding;
     }
 
     @Transactional
@@ -53,7 +59,9 @@ public class PersonTagService {
         }
         TagDefinition tag = requireEnabledTagById(tagId);
         for (String personId : personIds) {
-            saveBinding(personId, tag.getId(), "MANUAL", APPROVED, null, null, null, operator);
+            saveBinding(personId, tag.getId(), "MANUAL", "MANUAL", APPROVED,
+                    null, null, null, operator);
+            publishProfileRefresh(personId);
         }
         return personIds.size();
     }
@@ -67,8 +75,10 @@ public class PersonTagService {
             if (tag == null || tag.getStatus() == null || tag.getStatus() != 1) {
                 throw new BusinessException("REMOTE_TAG_NOT_FOUND", "远程标签编码未配置或已停用：" + tagCode);
             }
-            saveBinding(person.getId(), tag.getId(), "REMOTE", APPROVED, null, batchNo, null, "REMOTE_SYNC");
+            saveBinding(person.getId(), tag.getId(), "REMOTE", "REMOTE", APPROVED,
+                    null, batchNo, null, "REMOTE_SYNC");
         }
+        publishProfileRefresh(person.getId());
     }
 
     public void removeRemoteTags(PersonRecord person, List<String> removedTagCodes) {
@@ -82,24 +92,26 @@ public class PersonTagService {
                 personTagMapper.deleteRemote(person.getId(), tag.getId());
             }
         }
+        publishProfileRefresh(person.getId());
     }
 
     public void applyRules(PersonRecord person, String batchNo) {
         String searchableText = join(person.getOrganization(), person.getOccupation(),
                 person.getAddress(), person.getRemark());
         List<RuleMatch> matches = trieManager.match(searchableText);
-        Set<String> matchedTagIds = new LinkedHashSet<String>();
+        Set<String> matchedRuleIds = new LinkedHashSet<String>();
         for (RuleMatch match : matches) {
-            matchedTagIds.add(match.getTagId());
+            matchedRuleIds.add(match.getRuleId());
         }
         // 删除资料变更后已经不再命中的规则标签；REJECTED 记录保留，用于防止反复生成候选。
         personTagMapper.deleteStaleRuleBindings(
-                person.getId(), new java.util.ArrayList<String>(matchedTagIds));
+                person.getId(), new java.util.ArrayList<String>(matchedRuleIds));
         for (RuleMatch match : matches) {
-            saveBinding(person.getId(), match.getTagId(), "RULE",
+            saveBinding(person.getId(), match.getTagId(), "RULE", "KEYWORD:" + match.getRuleId(),
                     match.isAutoApprove() ? APPROVED : PENDING,
                     match.getRuleId(), batchNo, match.getKeyword(), null);
         }
+        publishProfileRefresh(person.getId());
     }
 
     @Transactional
@@ -117,6 +129,7 @@ public class PersonTagService {
             structuredRuleMapper.reviewActiveEvidence(binding.getPersonId(), binding.getTagId(),
                     binding.getRuleId(), status, reviewer, reviewedAt);
         }
+        publishProfileRefresh(binding.getPersonId());
     }
 
     @Transactional
@@ -135,6 +148,7 @@ public class PersonTagService {
         if (personTagMapper.deleteRuleBindingById(bindingId) == 0) {
             throw new BusinessException("BINDING_DELETE_FAILED", "规则标签结果删除失败");
         }
+        publishProfileRefresh(binding.getPersonId());
     }
 
     public List<PersonTag> listByPerson(String personId) {
@@ -159,23 +173,20 @@ public class PersonTagService {
         if (personTagMapper.deleteManual(personId, tagId) == 0) {
             throw new BusinessException("MANUAL_BINDING_NOT_FOUND", "不存在可解绑的人工标签");
         }
+        publishProfileRefresh(personId);
     }
 
-    private PersonTag saveBinding(String personId, String tagId, String source, String status,
+    private PersonTag saveBinding(String personId, String tagId, String source, String sourceRef, String status,
                                   String ruleId, String batchNo, String keyword, String reviewer) {
         Date now = new Date();
-        PersonTag existing = personTagMapper.find(personId, tagId);
+        PersonTag existing = personTagMapper.findBySource(personId, tagId, sourceRef);
         if (existing != null) {
             // 人工拒绝过的规则候选不应在下一轮同步中自动复活。
             if ("RULE".equals(source) && REJECTED.equals(existing.getStatus())) {
                 return existing;
             }
-            // 已确认的人工/远程标签可信度高于规则命中，规则不能覆盖其来源。
-            if ("RULE".equals(source) && APPROVED.equals(existing.getStatus())
-                    && !"RULE".equals(existing.getSource())) {
-                return existing;
-            }
             existing.setSource(source);
+            existing.setSourceRef(sourceRef);
             existing.setStatus(status);
             existing.setRuleId(ruleId);
             existing.setBatchNo(batchNo);
@@ -192,6 +203,7 @@ public class PersonTagService {
         binding.setPersonId(personId);
         binding.setTagId(tagId);
         binding.setSource(source);
+        binding.setSourceRef(sourceRef);
         binding.setStatus(status);
         binding.setRuleId(ruleId);
         binding.setBatchNo(batchNo);
@@ -229,5 +241,9 @@ public class PersonTagService {
             }
         }
         return builder.toString();
+    }
+
+    private void publishProfileRefresh(String personId) {
+        eventPublisher.publishEvent(new ProfileRefreshEvent(personId));
     }
 }

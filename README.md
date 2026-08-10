@@ -13,12 +13,19 @@
 - Vue 3 管理端覆盖人员维护、标签规则、候选审核和同步记录，静态资源随 Spring Boot 打入同一个 JAR。
 - 达梦初始化脚本和基于 H2 的自动化测试。
 - 动态指标及类型约束，支持文本、数值、日期、日期时间、布尔和枚举。
+- 人员详情动态展示当前指标值，统一转换布尔、枚举、日期和单位，便于人工核验规则命中结果。
 - 标签规则集版本、ALL/ANY 条件、类型化比较、存量人员重算和命中证据。
-- 根据当前指标动态生成 Excel 模板，文件先整体验证，失败时整批不写入。
+- 根据当前指标动态生成双语 Excel 模板和可直接导入的示例文件；第一行是字段编码、第二行是中文说明、第三行开始是数据，校验失败时整批不写入。
 - ES 人员画像副本，支持全文搜索、标签 AND/OR、指标过滤及标签/性别/职业聚合。
 - ES 主配置已启用、自动化测试强制关闭；只能显式重建固定前缀索引，演示数据上限默认 5000 人。
 
 当前刻意不引入 Redis、Spark 和 HBase，也不使用 ES 的集群级配置、通配符删除和自动建索引。
+
+## 开发约束
+
+- 修复历史错误逻辑时，不在正常业务代码中兼容旧 bug 的行为或其错误数据，也不保留新旧两套处理分支。
+- 历史错误数据经确认范围后，通过人工操作或独立的一次性脚本清理；清理逻辑不得混入长期运行的业务方法。
+- 方法严格遵守单一职责：业务处理、数据迁移、历史纠错和运维清理分别实现，禁止以“顺带兼容”为由合并职责。
 
 ## 环境
 
@@ -30,7 +37,7 @@
 ## 初始化达梦
 
 1. 使用独立用户/模式登录达梦。
-2. 新库依次执行 `V1__init.sql` 和 `V2__indicator_rule_profile.sql`。
+2. 新库依次执行 `V1__init.sql`、`V2__indicator_rule_profile.sql` 和 `V3__multi_source_tag_binding.sql`；已有 V2 数据库只需补执行 V3。
 3. 如需完整演示数据，再执行 `db/dm/demo/full_flow_demo_data.sql`；生产环境不要执行 `demo` 目录脚本。
 4. 设置环境变量：`DM_URL`、`DM_USERNAME`、`DM_PASSWORD`、`SCHEDULER_TOKEN`。
 
@@ -81,6 +88,7 @@ Content-Type: application/json
 
 ## 设计资料
 
+- [代码、全部接口与面试讲解手册](docs/interview-project-guide.md)
 - [架构与关键取舍](docs/architecture.md)
 - [远程人员接口协议](docs/remote-person-api.md)
 - [DolphinScheduler 调用方式](docs/dolphinscheduler.md)
